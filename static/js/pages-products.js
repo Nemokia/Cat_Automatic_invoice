@@ -32,13 +32,24 @@ async function renderProducts() {
                 </div>
                 <div class="form-group">
                   <label>واحد</label>
-                  <select class="form-select" id="pfUnit">
+                  <select class="form-select" id="pfUnit" onchange="toggleFrequency()">
                     <option value="عدد">عدد</option>
                     <option value="کیلوگرم">کیلوگرم</option>
                     <option value="متر">متر</option>
                     <option value="لیتر">لیتر</option>
                     <option value="بسته">بسته</option>
                     <option value="جعبه">جعبه</option>
+                    <option value="خدمات">خدمات</option>
+                  </select>
+                </div>
+                <div class="form-group" id="pfFreqGroup" style="display:none;">
+                  <label>دوره تکرار</label>
+                  <select class="form-select" id="pfFreq">
+                    <option value="hourly">ساعتی</option>
+                    <option value="daily">روزانه</option>
+                    <option value="weekly">هفتگی</option>
+                    <option value="monthly">ماهانه</option>
+                    <option value="yearly">سالانه</option>
                   </select>
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
@@ -69,6 +80,7 @@ async function renderProducts() {
         const data = {
             name: document.getElementById('pfName').value,
             unit: document.getElementById('pfUnit').value,
+            frequency: document.getElementById('pfUnit').value === 'خدمات' ? document.getElementById('pfFreq').value : '',
             description: document.getElementById('pfDesc').value
         };
         try {
@@ -104,7 +116,7 @@ async function loadProducts() {
         }
         tbody.innerHTML = results.map(p => `<tr>
             <td><strong>${escHtml(p.name)}</strong></td>
-            <td>${escHtml(p.unit || '-')}</td>
+            <td>${escHtml(p.unit || '-')}${p.unit === 'خدمات' && p.frequency ? ' <small style="color:var(--text-muted)">(' + escHtml(FREQ_LABELS[p.frequency] || p.frequency) + ')</small>' : ''}</td>
             <td>${formatNum(p.latest_price)} ریال</td>
             <td>${p.total_sold || 0}</td>
             <td>${formatNum(p.total_revenue)} ریال</td>
@@ -121,6 +133,8 @@ function showProductModal(prod) {
     document.getElementById('pfId').value = prod?.id || '';
     document.getElementById('pfName').value = prod?.name || '';
     document.getElementById('pfUnit').value = prod?.unit || 'عدد';
+    document.getElementById('pfFreq').value = prod?.frequency || 'daily';
+    toggleFrequency();
     document.getElementById('pfDesc').value = prod?.description || '';
     document.getElementById('pfPrice').value = prod?.latest_price || '';
     openModal('prodModal');
@@ -140,4 +154,12 @@ async function deleteProduct(id) {
         showToast('محصول حذف شد');
         loadProducts();
     } catch (err) { showToast(err.message, 'error'); }
+}
+
+const FREQ_LABELS = { hourly: 'ساعتی', daily: 'روزانه', weekly: 'هفتگی', monthly: 'ماهانه', yearly: 'سالانه' };
+
+function toggleFrequency() {
+    const isService = document.getElementById('pfUnit')?.value === 'خدمات';
+    const grp = document.getElementById('pfFreqGroup');
+    if (grp) grp.style.display = isService ? '' : 'none';
 }

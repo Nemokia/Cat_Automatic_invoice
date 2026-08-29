@@ -5,9 +5,18 @@ from decimal import Decimal
 
 class Product(models.Model):
     """Product model with latest price tracking."""
+    FREQUENCY_CHOICES = [
+        ('', ''),
+        ('hourly', 'ساعتی'),
+        ('daily', 'روزانه'),
+        ('weekly', 'هفتگی'),
+        ('monthly', 'ماهانه'),
+        ('yearly', 'سالانه'),
+    ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=200, verbose_name='نام کالا')
     unit = models.CharField(max_length=20, blank=True, default='عدد', verbose_name='واحد')
+    frequency = models.CharField(max_length=10, blank=True, default='', choices=FREQUENCY_CHOICES, verbose_name='دوره تکرار')
     description = models.TextField(blank=True, verbose_name='توضیحات')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
