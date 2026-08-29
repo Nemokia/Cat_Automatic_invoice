@@ -1,5 +1,5 @@
 /* ============================================
-   Invoices List Page
+   Invoices List Page — Mobile Card Layout
    ============================================ */
 async function renderInvoices() {
     const app = document.getElementById('app');
@@ -17,10 +17,10 @@ async function renderInvoices() {
           onclick="openDateScroller('invDateTo','invDateToISO')" style="flex:1;cursor:pointer;">
         <input type="hidden" id="invDateToISO">
       </div>
-      <div class="table-container">
-        <table><thead><tr>
-          <th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبلغ</th><th>وضعیت</th><th>عملیات</th>
-        </tr></thead><tbody id="invBody"></tbody></table>
+      <div id="invoiceContent">
+        <div class="loading-skeleton">
+          <div class="skel-row"></div><div class="skel-row"></div><div class="skel-row"></div>
+        </div>
       </div>
     `);
     loadInvoices();
@@ -37,27 +37,76 @@ async function loadInvoices() {
     try {
         const data = await API.getInvoices(params.toString());
         const results = data.results || data;
-        const tbody = document.getElementById('invBody');
+        const container = document.getElementById('invoiceContent');
         if (!results.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">فاکتوری یافت نشد</td></tr>';
+            container.innerHTML = `
+              <div class="empty-state">
+                <div class="icon">📄</div>
+                <p>هنوز فاکتوری ثبت نشده</p>
+                <button class="btn btn-primary" onclick="Router.navigate('/invoices/new')">صدور فاکتور جدید</button>
+              </div>`;
             return;
         }
-        tbody.innerHTML = results.map(inv => `<tr>
-            <td><strong>${escHtml(inv.invoice_number)}</strong></td>
-            <td>${escHtml(inv.customer_name || '-')}</td>
-            <td>${formatDate(inv.invoice_date)}</td>
-            <td>${formatNum(inv.final_amount)} ریال</td>
-            <td>${inv.is_paid
+        // Desktop table
+        let tableHtml = `
+          <div class="table-container desktop-only">
+            <table><thead><tr>
+              <th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبلغ</th><th>وضعیت</th><th>عملیات</th>
+            </tr></thead><tbody>
+            ${results.map(inv => `<tr>
+              <td><strong>${escHtml(inv.invoice_number)}</strong></td>
+              <td>${escHtml(inv.customer_name || '-')}</td>
+              <td>${formatDate(inv.invoice_date)}</td>
+              <td><strong>${formatNum(inv.final_amount)} ریال</strong></td>
+              <td>${inv.is_paid
                 ? '<span class="badge badge-success">پرداخت شده</span>'
                 : '<span class="badge badge-warning">پرداخت نشده</span>'}</td>
-            <td style="white-space:nowrap;">
-              <button class="btn btn-sm btn-secondary" onclick="Router.navigate('/invoices/${inv.id}')">ویرایش</button>
-              <button class="btn btn-sm btn-accent" onclick="duplicateInv(${inv.id})">کپی</button>
-              <button class="btn btn-sm btn-secondary" onclick="printInvoiceById(${inv.id})">🖨️ چاپ</button>
-              <button class="btn btn-sm btn-primary" onclick="API.downloadPdf(${inv.id})">PDF</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteInv(${inv.id})">حذف</button>
-            </td>
-        </tr>`).join('');
+              <td class="actions-cell" style="white-space:nowrap;">
+                <button class="btn btn-sm btn-secondary" onclick="Router.navigate('/invoices/${inv.id}')">ویرایش</button>
+                <button class="btn btn-sm btn-accent" onclick="duplicateInv(${inv.id})">کپی</button>
+                <button class="btn btn-sm btn-secondary" onclick="printInvoiceById(${inv.id})">🖨️ چاپ</button>
+                <button class="btn btn-sm btn-primary" onclick="API.downloadPdf(${inv.id})">PDF</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteInv(${inv.id})">حذف</button>
+              </td>
+            </tr>`).join('')}
+            </tbody></table>
+          </div>`;
+
+        // Mobile cards
+        let cardHtml = `<div class="mobile-cards mobile-only">
+          ${results.map(inv => `
+            <div class="mobile-card">
+              <div class="mobile-card-header">
+                <strong>${escHtml(inv.invoice_number)}</strong>
+                ${inv.is_paid
+                  ? '<span class="badge badge-success">پرداخت شده</span>'
+                  : '<span class="badge badge-warning">پرداخت نشده</span>'}
+              </div>
+              <div class="mobile-card-body">
+                <div class="mobile-card-row">
+                  <span class="card-label">مشتری</span>
+                  <span>${escHtml(inv.customer_name || '-')}</span>
+                </div>
+                <div class="mobile-card-row">
+                  <span class="card-label">تاریخ</span>
+                  <span>${formatDate(inv.invoice_date)}</span>
+                </div>
+                <div class="mobile-card-row">
+                  <span class="card-label">مبلغ</span>
+                  <strong>${formatNum(inv.final_amount)} ریال</strong>
+                </div>
+              </div>
+              <div class="mobile-card-actions">
+                <button class="btn btn-sm btn-secondary" onclick="Router.navigate('/invoices/${inv.id}')">ویرایش</button>
+                <button class="btn btn-sm btn-secondary" onclick="printInvoiceById(${inv.id})">🖨️</button>
+                <button class="btn btn-sm btn-primary" onclick="API.downloadPdf(${inv.id})">PDF</button>
+                <button class="btn btn-sm btn-accent" onclick="duplicateInv(${inv.id})">کپی</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteInv(${inv.id})">حذف</button>
+              </div>
+            </div>`).join('')}
+        </div>`;
+
+        container.innerHTML = tableHtml + cardHtml;
     } catch (err) { showToast('خطا در بارگذاری', 'error'); }
 }
 

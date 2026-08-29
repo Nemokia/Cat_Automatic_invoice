@@ -1,5 +1,5 @@
 /* ============================================
-   Customers Page
+   Customers Page — Mobile Card Layout
    ============================================ */
 async function renderCustomers() {
     const app = document.getElementById('app');
@@ -11,10 +11,10 @@ async function renderCustomers() {
       <div class="search-bar">
         <input class="form-input" id="custSearch" placeholder="جستجوی مشتری..." oninput="loadCustomers()">
       </div>
-      <div class="table-container">
-        <table><thead><tr>
-          <th>نام</th><th>تلفن</th><th>آدرس</th><th>فاکتورها</th><th>مجموع خرید</th><th>عملیات</th>
-        </tr></thead><tbody id="custBody"></tbody></table>
+      <div id="customerContent">
+        <div class="loading-skeleton">
+          <div class="skel-row"></div><div class="skel-row"></div><div class="skel-row"></div>
+        </div>
       </div>
 
       <div class="modal-overlay" id="custModal">
@@ -48,7 +48,7 @@ async function renderCustomers() {
                 </div>
               </div>
               <input type="hidden" id="cfId">
-              <div style="margin-top:16px;display:flex;gap:10px;">
+              <div class="form-actions">
                 <button class="btn btn-primary" type="submit">ذخیره</button>
                 <button class="btn btn-secondary" type="button" onclick="closeModal('custModal')">لغو</button>
               </div>
@@ -84,22 +84,65 @@ async function loadCustomers() {
     try {
         const data = await API.getCustomers(q);
         const results = data.results || data;
-        const tbody = document.getElementById('custBody');
+        const container = document.getElementById('customerContent');
         if (!results.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">مشتری‌ای یافت نشد</td></tr>';
+            container.innerHTML = `
+              <div class="empty-state">
+                <div class="icon">👥</div>
+                <p>هنوز مشتری اضافه نشده</p>
+                <button class="btn btn-primary" onclick="showCustomerModal()">افزودن مشتری</button>
+              </div>`;
             return;
         }
-        tbody.innerHTML = results.map(c => `<tr>
-            <td><strong>${escHtml(c.full_name)}</strong></td>
-            <td>${escHtml(c.phone || '-')}</td>
-            <td>${escHtml(c.address || '-')}</td>
-            <td>${c.invoice_count || 0}</td>
-            <td>${formatNum(c.total_purchases)} ریال</td>
-            <td>
-              <button class="btn btn-sm btn-secondary" onclick="editCustomer(${c.id})">ویرایش</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id})">حذف</button>
-            </td>
-        </tr>`).join('');
+        // Desktop table
+        let tableHtml = `
+          <div class="table-container desktop-only">
+            <table><thead><tr>
+              <th>نام</th><th>تلفن</th><th>آدرس</th><th>فاکتورها</th><th>مجموع خرید</th><th>عملیات</th>
+            </tr></thead><tbody>
+            ${results.map(c => `<tr>
+              <td><strong>${escHtml(c.full_name)}</strong></td>
+              <td>${escHtml(c.phone || '-')}</td>
+              <td>${escHtml(c.address || '-')}</td>
+              <td>${c.invoice_count || 0}</td>
+              <td><strong>${formatNum(c.total_purchases)} ریال</strong></td>
+              <td>
+                <button class="btn btn-sm btn-secondary" onclick="editCustomer(${c.id})">ویرایش</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id})">حذف</button>
+              </td>
+            </tr>`).join('')}
+            </tbody></table>
+          </div>`;
+
+        // Mobile cards
+        let cardHtml = `<div class="mobile-cards mobile-only">
+          ${results.map(c => `
+            <div class="mobile-card">
+              <div class="mobile-card-header">
+                <strong>${escHtml(c.full_name)}</strong>
+              </div>
+              <div class="mobile-card-body">
+                <div class="mobile-card-row">
+                  <span class="card-label">تلفن</span>
+                  <span>${escHtml(c.phone || '-')}</span>
+                </div>
+                <div class="mobile-card-row">
+                  <span class="card-label">آدرس</span>
+                  <span>${escHtml(c.address || '-')}</span>
+                </div>
+                <div class="mobile-card-row">
+                  <span class="card-label">مجموع خرید</span>
+                  <strong>${formatNum(c.total_purchases)} ریال</strong>
+                </div>
+              </div>
+              <div class="mobile-card-actions">
+                <button class="btn btn-sm btn-secondary" onclick="editCustomer(${c.id})">ویرایش</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id})">حذف</button>
+              </div>
+            </div>`).join('')}
+        </div>`;
+
+        container.innerHTML = tableHtml + cardHtml;
     } catch (err) { showToast('خطا در بارگذاری', 'error'); }
 }
 
