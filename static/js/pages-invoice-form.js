@@ -114,8 +114,10 @@ async function renderInvoiceForm(params) {
             </div>
           </div>
         </div>
-        <div style="margin-top:20px;display:flex;gap:10px;">
+        <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-lg" type="submit">ذخیره فاکتور</button>
+          <button class="btn btn-secondary btn-lg" type="button" onclick="window.print()">🖨️ چاپ فاکتور</button>
+          <button class="btn btn-accent btn-lg" type="button" id="pdfBtn" onclick="downloadInvoicePdf()" style="display:none;">📄 PDF</button>
           <button class="btn btn-secondary btn-lg" type="button" onclick="Router.navigate('/invoices')">لغو</button>
         </div>
       </form>
@@ -146,6 +148,7 @@ async function renderInvoiceForm(params) {
     // If editing, load existing invoice
     if (invoiceEditId) {
         document.getElementById('invFormTitle').textContent = 'ویرایش فاکتور';
+        document.getElementById('pdfBtn').style.display = '';
         try {
             const inv = await API.getInvoice(invoiceEditId);
             document.getElementById('invCustId').value = inv.customer || '';
@@ -211,9 +214,12 @@ async function renderInvoiceForm(params) {
             if (invoiceEditId) {
                 await API.updateInvoice(invoiceEditId, payload);
                 showToast('فاکتور ویرایش شد');
+                document.getElementById('pdfBtn').style.display = '';
             } else {
-                await API.createInvoice(payload);
+                const created = await API.createInvoice(payload);
                 showToast('فاکتور ایجاد شد');
+                invoiceEditId = created.id;
+                document.getElementById('pdfBtn').style.display = '';
             }
             Router.navigate('/invoices');
         } catch (err) { showToast(err.message, 'error'); }
@@ -340,4 +346,12 @@ function fillBankInfo() {
     document.getElementById('invCard').value = d.card_number || '';
     document.getElementById('invIban').value = d.iban || '';
     document.getElementById('invHolder').value = d.account_holder || '';
+}
+
+function downloadInvoicePdf() {
+    if (!invoiceEditId) {
+        showToast('ابتدا فاکتور را ذخیره کنید', 'error');
+        return;
+    }
+    window.open(`/api/pdf/${invoiceEditId}/`, '_blank');
 }
