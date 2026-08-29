@@ -53,6 +53,7 @@ async function loadInvoices() {
             <td style="white-space:nowrap;">
               <button class="btn btn-sm btn-secondary" onclick="Router.navigate('/invoices/${inv.id}')">ویرایش</button>
               <button class="btn btn-sm btn-accent" onclick="duplicateInv(${inv.id})">کپی</button>
+              <button class="btn btn-sm btn-secondary" onclick="printInvoiceById(${inv.id})">🖨️ چاپ</button>
               <button class="btn btn-sm btn-primary" onclick="API.downloadPdf(${inv.id})">PDF</button>
               <button class="btn btn-sm btn-danger" onclick="deleteInv(${inv.id})">حذف</button>
             </td>

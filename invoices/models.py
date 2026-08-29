@@ -35,7 +35,7 @@ class Invoice(models.Model):
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='invoices')
-    invoice_number = models.CharField(max_length=30, unique=True, verbose_name='شماره فاکتور')
+    invoice_number = models.CharField(max_length=30, verbose_name='شماره فاکتور')
 
     # Snapshot: customer info at time of invoice
     customer_name = models.CharField(max_length=200, blank=True, verbose_name='نام مشتری')
@@ -87,6 +87,7 @@ class Invoice(models.Model):
         verbose_name = 'فاکتور'
         verbose_name_plural = 'فاکتورها'
         ordering = ['-invoice_date', '-created_at']
+        unique_together = [['user', 'invoice_number']]
 
     def __str__(self):
         return f'{self.invoice_number} - {self.customer_name}'

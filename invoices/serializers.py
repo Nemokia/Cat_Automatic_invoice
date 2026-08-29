@@ -62,17 +62,16 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
+    bank_account = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = Invoice
         fields = [
-            'customer', 'invoice_date', 'due_date',
+            'id', 'customer', 'invoice_date', 'due_date',
             'invoice_tax_rate', 'discount_type', 'discount_value',
             'bank_account', 'notes', 'items'
         ]
-        extra_kwargs = {
-            'bank_account': {'required': False, 'write_only': True}
-        }
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
