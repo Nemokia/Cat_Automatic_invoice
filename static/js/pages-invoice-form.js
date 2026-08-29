@@ -116,7 +116,7 @@ async function renderInvoiceForm(params) {
         </div>
         <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-lg" type="submit">ذخیره فاکتور</button>
-          <button class="btn btn-secondary btn-lg" type="button" onclick="window.print()">🖨️ چاپ فاکتور</button>
+          <button class="btn btn-secondary btn-lg" type="button" onclick="printInvoice()">🖨️ چاپ فاکتور</button>
           <button class="btn btn-accent btn-lg" type="button" id="pdfBtn" onclick="downloadInvoicePdf()" style="display:none;">📄 PDF</button>
           <button class="btn btn-secondary btn-lg" type="button" onclick="Router.navigate('/invoices')">لغو</button>
         </div>
