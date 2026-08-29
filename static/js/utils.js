@@ -16,7 +16,8 @@ function formatNum(n) {
 
 function formatDate(d) {
     if (!d) return '-';
-    return new Date(d).toLocaleDateString('fa-IR');
+    const j = Jalali.fromISO(d);
+    return j ? Jalali.format(j) : d;
 }
 
 function escHtml(s) {

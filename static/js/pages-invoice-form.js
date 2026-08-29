@@ -31,11 +31,15 @@ async function renderInvoiceForm(params) {
             <div class="card-header"><h3>تاریخ و مالیات</h3></div>
             <div class="form-group">
               <label>تاریخ فاکتور</label>
-              <input class="form-input" id="invDate" type="date" required>
+              <input class="form-input jalali-display" id="invDate" readonly required placeholder="انتخاب تاریخ..."
+                onclick="openDateScroller('invDate', 'invDateISO')" style="cursor:pointer;">
+              <input type="hidden" id="invDateISO">
             </div>
             <div class="form-group">
               <label>تاریخ سررسید</label>
-              <input class="form-input" id="invDue" type="date">
+              <input class="form-input jalali-display" id="invDue" readonly placeholder="انتخاب تاریخ..."
+                onclick="openDateScroller('invDue', 'invDueISO')" style="cursor:pointer;">
+              <input type="hidden" id="invDueISO">
             </div>
             <div class="form-group">
               <label>نرخ مالیات فاکتور (%)</label>
@@ -147,8 +151,16 @@ async function renderInvoiceForm(params) {
             document.getElementById('invCustId').value = inv.customer || '';
             document.getElementById('invCustSearch').value = inv.customer_name || '';
             document.getElementById('invCustInfo').textContent = `${inv.customer_name || ''} | ${inv.customer_phone || ''}`;
-            document.getElementById('invDate').value = inv.invoice_date || '';
-            document.getElementById('invDue').value = inv.due_date || '';
+            document.getElementById('invDateISO').value = inv.invoice_date || '';
+            document.getElementById('invDueISO').value = inv.due_date || '';
+            if (inv.invoice_date) {
+                const j = Jalali.fromISO(inv.invoice_date);
+                document.getElementById('invDate').value = j ? Jalali.format(j) : inv.invoice_date;
+            }
+            if (inv.due_date) {
+                const j = Jalali.fromISO(inv.due_date);
+                document.getElementById('invDue').value = j ? Jalali.format(j) : inv.due_date;
+            }
             document.getElementById('invTaxRate').value = inv.invoice_tax_rate || 0;
             document.getElementById('invDiscType').value = inv.discount_type || '';
             document.getElementById('invDiscVal').value = inv.discount_value || 0;
@@ -168,7 +180,8 @@ async function renderInvoiceForm(params) {
             recalcInvoice();
         } catch (err) { showToast('خطا در بارگذاری فاکتور', 'error'); }
     } else {
-        document.getElementById('invDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('invDate').value = Jalali.format(Jalali.today());
+        document.getElementById('invDateISO').value = Jalali.toISO(Jalali.today());
         addInvoiceItem();
     }
 
@@ -176,8 +189,8 @@ async function renderInvoiceForm(params) {
         e.preventDefault();
         const payload = {
             customer: document.getElementById('invCustId').value || null,
-            invoice_date: document.getElementById('invDate').value,
-            due_date: document.getElementById('invDue').value || null,
+            invoice_date: document.getElementById('invDateISO').value,
+            due_date: document.getElementById('invDueISO').value || null,
             invoice_tax_rate: parseFloat(document.getElementById('invTaxRate').value) || 0,
             discount_type: document.getElementById('invDiscType').value || '',
             discount_value: parseInt(document.getElementById('invDiscVal').value) || 0,

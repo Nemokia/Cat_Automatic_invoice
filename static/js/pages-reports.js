@@ -23,8 +23,12 @@ async function showReportTab(tab, btn) {
     if (tab === 'sales') {
         c.innerHTML = `
           <div class="search-bar">
-            <input class="form-input" id="rptFrom" type="date" style="flex:1;">
-            <input class="form-input" id="rptTo" type="date" style="flex:1;">
+            <input class="form-input jalali-display" id="rptFrom" readonly placeholder="از تاریخ..."
+              onclick="openDateScroller('rptFrom','rptFromISO')" style="flex:1;cursor:pointer;">
+            <input type="hidden" id="rptFromISO">
+            <input class="form-input jalali-display" id="rptTo" readonly placeholder="تا تاریخ..."
+              onclick="openDateScroller('rptTo','rptToISO')" style="flex:1;cursor:pointer;">
+            <input type="hidden" id="rptToISO">
             <button class="btn btn-primary" onclick="loadSalesReport()">نمایش</button>
             <button class="btn btn-accent" onclick="exportSales()">دانلود Excel</button>
           </div>
@@ -81,8 +85,8 @@ async function showReportTab(tab, btn) {
 }
 
 async function loadSalesReport() {
-    const from = document.getElementById('rptFrom')?.value || '';
-    const to = document.getElementById('rptTo')?.value || '';
+    const from = document.getElementById('rptFromISO')?.value || '';
+    const to = document.getElementById('rptToISO')?.value || '';
     const params = new URLSearchParams();
     if (from) params.set('date_from', from);
     if (to) params.set('date_to', to);
@@ -98,17 +102,22 @@ async function loadSalesReport() {
         const monthly = data.monthly || [];
         const tbody = document.getElementById('salesMonthly');
         if (!monthly.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty-state">داده‌ای نیست</td></tr>'; return; }
-        tbody.innerHTML = monthly.map(m => `<tr>
-            <td>${m.invoice_date__year}/${String(m.invoice_date__month).padStart(2,'0')}</td>
+        tbody.innerHTML = monthly.map(m => {
+            // Convert Gregorian month start to Jalali for display
+            const gDate = `${m.invoice_date__year}-${String(m.invoice_date__month).padStart(2,'0')}-01`;
+            const j = Jalali.fromISO(gDate);
+            const label = j ? `${faNum(j.jy)}/${faNum(String(j.jm).padStart(2,'0'))}` : `${m.invoice_date__year}/${m.invoice_date__month}`;
+            return `<tr>
+            <td>${label}</td>
             <td>${m.count}</td>
             <td>${formatNum(m.total)} ریال</td>
-        </tr>`).join('');
+        </tr>`; }).join('');
     } catch (err) { showToast('خطا در بارگذاری', 'error'); }
 }
 
 function exportSales() {
-    const from = document.getElementById('rptFrom')?.value || '';
-    const to = document.getElementById('rptTo')?.value || '';
+    const from = document.getElementById('rptFromISO')?.value || '';
+    const to = document.getElementById('rptToISO')?.value || '';
     const params = new URLSearchParams();
     if (from) params.set('date_from', from);
     if (to) params.set('date_to', to);

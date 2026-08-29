@@ -10,8 +10,12 @@ async function renderInvoices() {
       </div>
       <div class="search-bar">
         <input class="form-input" id="invSearch" placeholder="جستجوی فاکتور..." oninput="loadInvoices()" style="flex:2;">
-        <input class="form-input" id="invDateFrom" type="date" onchange="loadInvoices()" style="flex:1;">
-        <input class="form-input" id="invDateTo" type="date" onchange="loadInvoices()" style="flex:1;">
+        <input class="form-input jalali-display" id="invDateFrom" readonly placeholder="از تاریخ..."
+          onclick="openDateScroller('invDateFrom','invDateFromISO')" style="flex:1;cursor:pointer;">
+        <input type="hidden" id="invDateFromISO">
+        <input class="form-input jalali-display" id="invDateTo" readonly placeholder="تا تاریخ..."
+          onclick="openDateScroller('invDateTo','invDateToISO')" style="flex:1;cursor:pointer;">
+        <input type="hidden" id="invDateToISO">
       </div>
       <div class="table-container">
         <table><thead><tr>
@@ -24,8 +28,8 @@ async function renderInvoices() {
 
 async function loadInvoices() {
     const q = document.getElementById('invSearch')?.value || '';
-    const df = document.getElementById('invDateFrom')?.value || '';
-    const dt = document.getElementById('invDateTo')?.value || '';
+    const df = document.getElementById('invDateFromISO')?.value || '';
+    const dt = document.getElementById('invDateToISO')?.value || '';
     const params = new URLSearchParams();
     if (q) params.set('search', q);
     if (df) params.set('date_from', df);
