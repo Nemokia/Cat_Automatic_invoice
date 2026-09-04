@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% load jalali_tags %}
+{% load humanize %}
+{% block title %}داشبورد — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>داشبورد</h1>
+    <a href="{% url 'frontend:invoice_create' %}" class="btn btn-primary">+ فاکتور جدید</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">📄</div>
+        <div class="stat-info">
+            <div class="value">{{ total_invoices }}</div>
+            <div class="label">فاکتورها</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+            <div class="value">{{ total_revenue|intcomma }} ریال</div>
+            <div class="label">درآمد کل</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <div class="stat-info">
+            <div class="value">{{ total_products }}</div>
+            <div class="label">محصولات</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-info">
+            <div class="value">{{ total_customers }}</div>
+            <div class="label">مشتریان</div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Revenue Chart -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>📈 درآمد ماهانه (۱۲ ماه اخیر)</h3>
+        <div style="display:flex;gap:16px;align-items:center;font-size:13px;">
+            <span style="color:var(--text-secondary);">این ماه: <strong style="color:var(--green);">{{ this_month_rev|intcomma }} ریال</strong></span>
+            {% if month_change_pct >= 0 %}
+            <span style="color:var(--success);">▲ {{ month_change_pct }}٪ نسبت به ماه قبل</span>
+            {% else %}
+            <span style="color:var(--danger);">▼ {{ month_change_pct|floatformat:1 }}٪ نسبت به ماه قبل</span>
+            {% endif %}
+        </div>
+    </div>
+    <div style="position:relative;height:280px;padding:8px 0;">
+        <canvas id="revenueChart"></canvas>
+    </div>
+</div>
+
+<div class="card" id="recentSection">
+    <div class="card-header">
+        <h3>آخرین فاکتورها</h3>
+        <a href="{% url 'frontend:invoice_list' %}" class="btn btn-sm btn-secondary">مشاهده همه</a>
+    </div>
+
+    {% if recent_invoices %}
+    <!-- Desktop Table -->
+    <div class="table-container desktop-only">
+        <table>
+            <thead><tr>
+                <th>شماره</th><th>مشتری</th><th>تاریخ</th><th>مبلغ</th><th>وضعیت</th>
+            </tr></thead>
+            <tbody>
+            {% for inv in recent_invoices %}
+            <tr onclick="location.href='{% url 'frontend:invoice_detail' inv.id %}'" style="cursor:pointer;">
+                <td><strong>{{ inv.invoice_number }}</strong></td>
+                <td>{{ inv.customer_name|default:"-" }}</td>
+                <td>{{ inv.invoice_date|jalali }}</td>
+                <td><strong>{{ inv.final_amount|intcomma }} ریال</strong></td>
+                <td>
+                    {% if inv.is_paid %}
+                    <span class="badge badge-success">پرداخت شده</span>
+                    {% else %}
+                    <span class="badge badge-warning">پرداخت نشده</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile Cards -->
+    <div class="mobile-cards mobile-only">
+        {% for inv in recent_invoices %}
+        <div class="mobile-card" onclick="location.href='{% url 'frontend:invoice_detail' inv.id %}'" style="cursor:pointer;">
+            <div class="mobile-card-header">
+                <strong>{{ inv.invoice_number }}</strong>
+                {% if inv.is_paid %}
+                <span class="badge badge-success">پرداخت شده</span>
+                {% else %}
+                <span class="badge badge-warning">پرداخت نشده</span>
+                {% endif %}
+            </div>
+            <div class="mobile-card-body">
+                <div class="mobile-card-row">
+                    <span class="card-label">مشتری</span>
+                    <span>{{ inv.customer_name|default:"-" }}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="card-label">تاریخ</span>
+                    <span>{{ inv.invoice_date|jalali }}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="card-label">مبلغ</span>
+                    <strong>{{ inv.final_amount|intcomma }} ریال</strong>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">📄</div>
+        <p>هنوز فاکتوری ثبت نشده</p>
+        <a href="{% url 'frontend:invoice_create' %}" class="btn btn-primary" style="margin-top:12px;">اولین فاکتور را بسازید</a>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const labels = {{ chart_labels|safe }};
+    const revenues = {{ chart_revenues|safe }};
+    const counts = {{ chart_counts|safe }};
+
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+
+    // Gradient fill
+    const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+    gradient.addColorStop(0, 'rgba(42, 131, 95, 0.3)');
+    gradient.addColorStop(1, 'rgba(42, 131, 95, 0.02)');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'درآمد (ریال)',
+                data: revenues,
+                borderColor: '#2A835F',
+                backgroundColor: gradient,
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: '#2A835F',
+                pointBorderColor: '#092328',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 7,
+                pointHoverBackgroundColor: '#8BBB92',
+                yAxisID: 'y',
+            }, {
+                label: 'تعداد فاکتور',
+                data: counts,
+                borderColor: '#49A4BB',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
+                borderDash: [5, 5],
+                fill: false,
+                tension: 0.35,
+                pointBackgroundColor: '#49A4BB',
+                pointBorderColor: '#092328',
+                pointBorderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                yAxisID: 'y1',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#9ab5a5',
+                        font: { family: 'Vazirmatn', size: 12 },
+                        usePointStyle: true,
+                        padding: 16,
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#13393f',
+                    titleColor: '#e8f0ec',
+                    bodyColor: '#9ab5a5',
+                    borderColor: '#1a4a42',
+                    borderWidth: 1,
+                    titleFont: { family: 'Vazirmatn', size: 13 },
+                    bodyFont: { family: 'Vazirmatn', size: 12 },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(ctx) {
+                            if (ctx.datasetIndex === 0) {
+                                return ' درآمد: ' + ctx.parsed.y.toLocaleString('fa-IR') + ' ریال';
+                            }
+                            return ' فاکتور: ' + ctx.parsed.y.toLocaleString('fa-IR') + ' عدد';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(26, 74, 66, 0.3)', drawBorder: false },
+                    ticks: {
+                        color: '#6a8f7a',
+                        font: { family: 'Vazirmatn', size: 11 },
+                    }
+                },
+                y: {
+                    position: 'right',
+                    grid: { color: 'rgba(26, 74, 66, 0.3)', drawBorder: false },
+                    ticks: {
+                        color: '#6a8f7a',
+                        font: { family: 'Vazirmatn', size: 11 },
+                        callback: function(val) {
+                            if (val >= 1e9) return (val / 1e9).toFixed(1) + ' میلیارد';
+                            if (val >= 1e6) return (val / 1e6).toFixed(0) + ' میلیون';
+                            if (val >= 1e3) return (val / 1e3).toFixed(0) + ' هزار';
+                            return val.toLocaleString('fa-IR');
+                        }
+                    },
+                    beginAtZero: true,
+                },
+                y1: {
+                    position: 'left',
+                    grid: { display: false },
+                    ticks: {
+                        color: '#49A4BB',
+                        font: { family: 'Vazirmatn', size: 11 },
+                        stepSize: 1,
+                        callback: function(val) { return val.toLocaleString('fa-IR'); }
+                    },
+                    beginAtZero: true,
+                }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 from rest_framework import generics, filters, status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Q
 from .models import Invoice
@@ -42,12 +43,73 @@ class InvoiceListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(customer_id=customer_id)
         return qs
 
+    def create(self, request, *args, **kwargs):
+        # Idempotency: check X-Idempotency-Key header
+        idempotency_key = request.headers.get('X-Idempotency-Key')
+        if idempotency_key:
+            existing = Invoice.objects.filter(
+                user=request.user,
+                idempotency_key=idempotency_key
+            ).first()
+            if existing:
+                return Response(
+                    InvoiceDetailSerializer(existing).data,
+                    status=status.HTTP_200_OK
+                )
+
+        response = super().create(request, *args, **kwargs)
+
+        # Store idempotency key on the created invoice
+        if idempotency_key and response.status_code == 201:
+            invoice_id = response.data.get('id')
+            if invoice_id:
+                Invoice.objects.filter(id=invoice_id).update(
+                    idempotency_key=idempotency_key
+                )
+
+        return response
+
 
 class InvoiceDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = InvoiceDetailSerializer
+    def get_serializer_class(self):
+        # PATCH/PUT use the create serializer: it carries the smart-customer
+        # and manual bank fields; GET keeps the rich detail serializer.
+        if self.request.method in ('PUT', 'PATCH'):
+            return InvoiceCreateSerializer
+        return InvoiceDetailSerializer
 
     def get_queryset(self):
         return Invoice.objects.filter(user=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        # Conflict detection: check If-Unmodified-Since or version
+        invoice = self.get_object()
+        client_version = request.headers.get('X-Client-Version')
+        if client_version:
+            try:
+                client_ver = int(client_version)
+                if client_ver < invoice.version:
+                    return Response(
+                        {
+                            'conflict': True,
+                            'server_version': invoice.version,
+                            'server_data': InvoiceDetailSerializer(invoice).data,
+                            'message': 'این فاکتور توسط کاربر دیگری یا در دستگاه دیگر تغییر کرده است.',
+                        },
+                        status=status.HTTP_409_CONFLICT
+                    )
+            except (ValueError, TypeError):
+                pass
+
+        response = super().update(request, *args, **kwargs)
+
+        # Increment version after successful update
+        if response.status_code in (200, 204):
+            invoice.refresh_from_db()
+            invoice.version = (invoice.version or 0) + 1
+            invoice.save(update_fields=['version'])
+
+        return response
 
 
 @api_view(['POST'])
@@ -92,3 +154,117 @@ def invoice_duplicate(request, pk):
     new_invoice.save()
 
     return Response(InvoiceDetailSerializer(new_invoice).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def sync_batch_view(request):
+    """Batch sync endpoint for offline operations.
+
+    Accepts a list of operations and processes them atomically.
+    Each operation has: { type, url, method, payload, clientId }
+    Returns results per operation with conflict detection.
+    """
+    operations = request.data.get('operations', [])
+    if not operations:
+        return Response({'detail': 'هیچ عملیاتی ارسال نشد'}, status=400)
+
+    results = []
+    for op in operations:
+        client_id = op.get('clientId')
+        op_type = op.get('type', '')
+        payload = op.get('payload', {})
+
+        # Check idempotency
+        if client_id:
+            existing = Invoice.objects.filter(
+                user=request.user,
+                idempotency_key=client_id
+            ).first()
+            if existing:
+                results.append({
+                    'clientId': client_id,
+                    'success': True,
+                    'serverId': existing.pk,
+                    'duplicate': True,
+                })
+                continue
+
+        try:
+            if op_type == 'create_invoice':
+                from .serializers import InvoiceCreateSerializer
+                serializer = InvoiceCreateSerializer(
+                    data=payload,
+                    context={'request': request}
+                )
+                if serializer.is_valid():
+                    invoice = serializer.save(user=request.user)
+                    if client_id:
+                        invoice.idempotency_key = client_id
+                        invoice.save(update_fields=['idempotency_key'])
+                    results.append({
+                        'clientId': client_id,
+                        'success': True,
+                        'serverId': invoice.pk,
+                    })
+                else:
+                    results.append({
+                        'clientId': client_id,
+                        'success': False,
+                        'error': str(serializer.errors),
+                    })
+            elif op_type == 'update_invoice':
+                invoice_id = payload.pop('id', None) or op.get('serverId')
+                try:
+                    invoice = Invoice.objects.get(id=invoice_id, user=request.user)
+                    # Conflict check
+                    client_version = op.get('version')
+                    if client_version and client_version < invoice.version:
+                        results.append({
+                            'clientId': client_id,
+                            'success': False,
+                            'conflict': True,
+                            'serverVersion': invoice.version,
+                            'serverData': InvoiceDetailSerializer(invoice).data,
+                        })
+                        continue
+
+                    serializer = InvoiceCreateSerializer(
+                        invoice, data=payload, partial=True,
+                        context={'request': request}
+                    )
+                    if serializer.is_valid():
+                        invoice = serializer.save()
+                        invoice.version = (invoice.version or 0) + 1
+                        invoice.save(update_fields=['version'])
+                        results.append({
+                            'clientId': client_id,
+                            'success': True,
+                            'serverId': invoice.pk,
+                        })
+                    else:
+                        results.append({
+                            'clientId': client_id,
+                            'success': False,
+                            'error': str(serializer.errors),
+                        })
+                except Invoice.DoesNotExist:
+                    results.append({
+                        'clientId': client_id,
+                        'success': False,
+                        'error': 'فاکتور یافت نشد',
+                    })
+            else:
+                results.append({
+                    'clientId': client_id,
+                    'success': False,
+                    'error': f'نوع عملیات ناشناخته: {op_type}',
+                })
+        except Exception as e:
+            results.append({
+                'clientId': client_id,
+                'success': False,
+                'error': str(e),
+            })
+
+    return Response({'results': results})

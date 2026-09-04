@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}حساب‌های بانکی — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>حساب‌های بانکی</h1>
+    <a href="{% url 'frontend:bank_create' %}" class="btn btn-primary">+ حساب جدید</a>
+</div>
+
+<div class="search-bar">
+    <form method="get" action="{% url 'frontend:bank_list' %}" style="display:flex;gap:8px;max-width:460px;flex:1;">
+        <input class="form-input" placeholder="جستجو: نام بانک، کارت، شبا، صاحب حساب..." name="search"
+               value="{{ search_query }}" style="flex:1;">
+        <button type="submit" class="btn btn-secondary">🔍</button>
+        {% if search_query %}<a href="{% url 'frontend:bank_list' %}" class="btn btn-secondary">✕</a>{% endif %}
+    </form>
+</div>
+
+{% if accounts %}
+<form id="bulkDeleteForm" method="post" action="{% url 'frontend:bank_bulk_delete' %}">
+{% csrf_token %}
+<div id="bulkActions" style="display:none;margin-bottom:12px;">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('آیا از حذف دسته‌ای اطمینان دارید؟')">حذف انتخاب شده</button>
+    <span id="selectedCount"></span>
+</div>
+<div class="table-container desktop-only">
+    <table id="bankTable">
+        <thead><tr>
+            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+            <th>بانک</th><th>شماره کارت</th><th>شماره شبا</th><th>صاحب حساب</th><th>پیش‌فرض</th><th>عملیات</th>
+        </tr></thead>
+        <tbody>
+        {% for a in accounts %}
+        <tr>
+            <td><input type="checkbox" name="bank_ids" value="{{ a.id }}" class="item-checkbox" onchange="updateBulkActions()"></td>
+            <td><strong>{{ a.bank.name }}</strong></td>
+            <td dir="ltr" style="text-align:left;">{{ a.card_number }}</td>
+            <td dir="ltr" style="text-align:left;overflow-wrap:anywhere;">{{ a.iban }}</td>
+            <td>{{ a.account_holder }}</td>
+            <td>{% if a.is_default %}<span class="badge badge-success">پیش‌فرض</span>{% endif %}</td>
+            <td>
+                <a href="{% url 'frontend:bank_edit' a.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+                <form method="post" action="{% url 'frontend:bank_delete' a.id %}" style="display:inline;"
+                      data-confirm="آیا از حذف این حساب اطمینان دارید؟">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+</form>
+
+<div class="mobile-cards mobile-only">
+    {% for a in accounts %}
+    <div class="mobile-card">
+        <div class="mobile-card-header">
+            <strong>{{ a.bank.name }}</strong>
+            {% if a.is_default %}<span class="badge badge-success">پیش‌فرض</span>{% endif %}
+        </div>
+        <div class="mobile-card-body">
+            <div class="mobile-card-row">
+                <span class="card-label">شماره کارت</span>
+                <span dir="ltr">{{ a.card_number }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">شماره شبا</span>
+                <span dir="ltr" style="overflow-wrap:anywhere;">{{ a.iban }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">صاحب حساب</span>
+                <span>{{ a.account_holder }}</span>
+            </div>
+        </div>
+        <div class="mobile-card-actions">
+            <a href="{% url 'frontend:bank_edit' a.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+            <form method="post" action="{% url 'frontend:bank_delete' a.id %}" style="display:inline;"
+                  data-confirm="آیا از حذف این حساب اطمینان دارید؟">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% include "frontend/includes/pagination.html" %}
+{% else %}
+<div class="empty-state">
+    <div class="icon">🏦</div>
+    {% if search_query %}
+    <p>نتیجه‌ای برای «{{ search_query }}» یافت نشد</p>
+    <a href="{% url 'frontend:bank_list' %}" class="btn btn-secondary" style="margin-top:12px;">حذف جستجو</a>
+    {% else %}
+    <p>حساب بانکی ثبت نشده</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% block extra_js %}
+<script>
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.item-checkbox').forEach(c => c.checked = cb.checked);
+    updateBulkActions();
+}
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.item-checkbox:checked').length;
+    const bar = document.getElementById('bulkActions');
+    const cnt = document.getElementById('selectedCount');
+    if (checked > 0) {
+        bar.style.display = 'block';
+        cnt.textContent = checked + ' مورد انتخاب شده';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}ورود — Cat Invoice{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="logo">🐱</div>
+        <h1>Cat Invoice</h1>
+        <p class="subtitle">سیستم مدیریت فاکتور</p>
+
+        {% if messages %}
+        <div style="margin-bottom:12px;">
+            {% for message in messages %}
+            <div class="field-error" style="display:block;{% if message.tags == 'success' %}background:rgba(42,131,95,0.15);color:var(--accent);border-color:var(--green);{% elif message.tags == 'warning' %}background:rgba(255,203,86,0.15);color:var(--warning);border-color:var(--warning);{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if otp_step == 'sent' %}
+        {# ── OTP Code Entry ── #}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="action" value="otp_verify">
+            <input type="hidden" name="email" value="{{ otp_email }}">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;text-align:center;">
+                کد ۵ رقمی ارسال شده به <strong>{{ otp_email }}</strong> را وارد کنید
+            </p>
+            <div class="form-group">
+                <label for="id_otp_code">کد تأیید</label>
+                <input class="form-input" type="text" id="id_otp_code" name="otp_code"
+                       required maxlength="5" pattern="\d{5}" dir="ltr"
+                       placeholder="XXXXX" autocomplete="one-time-code"
+                       inputmode="numeric" style="text-align:center;font-size:24px;letter-spacing:8px;">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">تأیید و ورود</button>
+        </form>
+        <p style="margin-top:12px;font-size:13px;text-align:center;">
+            <a href="{% url 'frontend:login' %}" style="color:var(--text-muted);">بازگشت به ورود با رمز عبور</a>
+        </p>
+
+        {% elif otp_step == 'email' %}
+        {# ── OTP Email Entry ── #}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="action" value="otp_request">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;text-align:center;">
+                ایمیل ثبت‌شده در حساب خود را وارد کنید
+            </p>
+            <div class="form-group">
+                <label for="id_otp_email">ایمیل</label>
+                <input class="form-input" type="email" id="id_otp_email" name="email" dir="ltr"
+                       placeholder="email@example.com" required value="{{ otp_email|default:'' }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">ارسال کد تأیید</button>
+        </form>
+        <p style="margin-top:12px;font-size:13px;text-align:center;">
+            <a href="{% url 'frontend:login' %}" style="color:var(--text-muted);">بازگشت به ورود با رمز عبور</a>
+        </p>
+
+        {% else %}
+        {# ── Normal Password Login ── #}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+            <div class="form-group">
+                <label for="id_username">نام کاربری / ایمیل / موبایل</label>
+                <input class="form-input" type="text" id="id_username" name="username" required
+                       placeholder="نام کاربری، ایمیل یا شماره موبایل" autocomplete="username"
+                       value="{{ username|default:'' }}">
+            </div>
+            <div class="form-group">
+                <label for="id_password">رمز عبور</label>
+                <input class="form-input" type="password" id="id_password" name="password" required
+                       placeholder="رمز عبور" autocomplete="current-password">
+            </div>
+            {% if needs_captcha %}
+            <div class="form-group captcha-group">
+                <label>کد امنیتی (حاصل محاسبه را وارد کنید)</label>
+                <div class="captcha-row">
+                    <img src="{{ captcha_image_url }}" alt="captcha" class="captcha-img">
+                    <button type="button" class="captcha-reload" onclick="reloadCaptcha(this)" title="بارگذاری مجدد کد">🔄</button>
+                    <input class="form-input" type="text" name="captcha_1" required
+                           placeholder="؟" dir="ltr" inputmode="numeric" autocomplete="off">
+                    <input type="hidden" name="captcha_0" value="{{ captcha_key }}">
+                </div>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-block">ورود</button>
+        </form>
+
+        <div style="margin-top:16px;text-align:center;">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">یا</p>
+            <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="otp_request">
+                <button type="button" class="btn btn-block" style="background:var(--surface-elevated);border:1px solid var(--border);"
+                        onclick="this.closest('form').querySelector('[name=action]').value='otp_request';document.getElementById('otpEmailForm').style.display='block';this.closest('form').style.display='none';">
+                    🔑 ورود با رمز یکبارمصرف
+                </button>
+            </form>
+        </div>
+
+        {# Hidden OTP email form #}
+        <div id="otpEmailForm" style="display:none;margin-top:16px;">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="action" value="otp_request">
+                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;text-align:center;">
+                    ایمیل ثبت‌شده در حساب خود را وارد کنید
+                </p>
+                <div class="form-group">
+                    <label for="id_otp_email2">ایمیل</label>
+                    <input class="form-input" type="email" id="id_otp_email2" name="email" dir="ltr"
+                           placeholder="email@example.com" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">ارسال کد تأیید</button>
+            </form>
+            <p style="margin-top:8px;font-size:13px;text-align:center;">
+                <a href="#" onclick="document.getElementById('otpEmailForm').style.display='none';document.querySelector('.auth-card form[action]').style.display='block';return false;" style="color:var(--text-muted);">بازگشت</a>
+            </p>
+        </div>
+
+        <p style="margin-top:16px;font-size:14px;text-align:center;">
+            <a href="{% url 'frontend:register' %}" style="color:var(--green);">ثبتنام</a>
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

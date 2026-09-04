@@ -80,6 +80,10 @@ class Invoice(models.Model):
     # Status
     is_paid = models.BooleanField(default=False, verbose_name='پرداخت شده')
 
+    # PWA / Offline sync
+    idempotency_key = models.CharField(max_length=64, blank=True, db_index=True, verbose_name='کلید عدم تکرار')
+    version = models.IntegerField(default=0, verbose_name='نسخه')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -135,6 +139,7 @@ class InvoiceItem(models.Model):
     total_price = models.DecimalField(max_digits=15, decimal_places=0, default=0, verbose_name='مبلغ کل')
     tax_amount = models.DecimalField(max_digits=15, decimal_places=0, default=0, verbose_name='مالیات')
     unit = models.CharField(max_length=20, blank=True, default='عدد', verbose_name='واحد')
+    frequency = models.CharField(max_length=10, blank=True, default='', verbose_name='دوره تکرار')
 
     order = models.PositiveIntegerField(default=0, verbose_name='ردیف')
 

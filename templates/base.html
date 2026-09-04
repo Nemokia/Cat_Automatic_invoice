@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#12544F">
+    <meta name="description" content="Cat Automatic Invoice - سیستم صدور و مدیریت فاکتور">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cat Invoice">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <title>{% block title %}Cat Invoice{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- PWA Status Bar -->
+    <div id="pwaStatus" class="pwa-status" style="display:none;">
+        <span id="pwaStatusIcon">🔴</span>
+        <span id="pwaStatusText">آفلاین</span>
+        <span id="pwaQueueCount" style="display:none;"></span>
+        <button id="pwaSyncBtn" onclick="CatSync.forceSync()" style="display:none;" title="همگام‌سازی دستی">🔄</button>
+    </div>
+
+    <!-- Mobile Header (tablet + mobile) -->
+    <div class="mobile-header">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="باز کردن منو">☰</button>
+        <h3>Cat Invoice</h3>
+        <span></span>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar (Desktop + Mobile slide) -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>🐱 Cat Invoice</h2>
+            <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+        </div>
+        <div class="sidebar-nav">
+            <a href="{% url 'frontend:dashboard' %}" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                <span class="icon">🏠</span>داشبورد
+            </a>
+            <a href="{% url 'frontend:invoice_list' %}" class="{% if active_page == 'invoices' %}active{% endif %}">
+                <span class="icon">📄</span>فاکتورها
+            </a>
+            <a href="{% url 'frontend:customer_list' %}" class="{% if active_page == 'customers' %}active{% endif %}">
+                <span class="icon">👥</span>مشتریان
+            </a>
+            <a href="{% url 'frontend:product_list' %}" class="{% if active_page == 'products' %}active{% endif %}">
+                <span class="icon">📦</span>محصولات
+            </a>
+            <a href="{% url 'frontend:bank_list' %}" class="{% if active_page == 'banks' %}active{% endif %}">
+                <span class="icon">🏦</span>حساب‌های بانکی
+            </a>
+            <a href="{% url 'frontend:report_sales' %}" class="{% if active_page == 'reports' %}active{% endif %}">
+                <span class="icon">📊</span>گزارش‌ها
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <a href="{% url 'frontend:settings' %}" style="color:rgba(255,255,255,0.7);text-decoration:none;font-size:13px;">⚙️ تنظیمات</a>
+            <form method="post" action="{% url 'frontend:logout' %}" id="logoutForm" style="margin-top:8px;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm" style="width:100%;justify-content:center;background:rgba(255,255,255,0.1);color:#fff;">
+                    خروج
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav class="bottom-nav" id="bottomNav" role="navigation" aria-label="ناوبری اصلی">
+        <a href="{% url 'frontend:dashboard' %}" class="{% if active_page == 'dashboard' %}active{% endif %}">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">خانه</span>
+        </a>
+        <a href="{% url 'frontend:invoice_create' %}" class="{% if active_page == 'invoice-create' %}active{% endif %}">
+            <span class="nav-icon">✏️</span>
+            <span class="nav-label">صدور فاکتور</span>
+        </a>
+        <a href="{% url 'frontend:invoice_list' %}" class="{% if active_page == 'invoices' %}active{% endif %}">
+            <span class="nav-icon">📄</span>
+            <span class="nav-label">فاکتورها</span>
+        </a>
+        <a href="{% url 'frontend:customer_list' %}" class="{% if active_page == 'customers' %}active{% endif %}">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label">مشتریان</span>
+        </a>
+        <a href="#" class="more-toggle" onclick="toggleMoreMenu(event)">
+            <span class="nav-icon">☰</span>
+            <span class="nav-label">بیشتر</span>
+        </a>
+    </nav>
+
+    <!-- More Menu Overlay (Mobile) -->
+    <div class="more-overlay" id="moreOverlay" onclick="closeMoreMenu()">
+        <div class="more-menu" onclick="event.stopPropagation()">
+            <div class="more-menu-header">
+                <h3>بیشتر</h3>
+                <button class="modal-close" onclick="closeMoreMenu()">&times;</button>
+            </div>
+            <a href="{% url 'frontend:product_list' %}">📦 محصولات</a>
+            <a href="{% url 'frontend:bank_list' %}">🏦 حساب‌های بانکی</a>
+            <a href="{% url 'frontend:report_sales' %}">📊 گزارش‌ها</a>
+            <a href="{% url 'frontend:settings' %}">⚙️ تنظیمات</a>
+            <div class="more-divider"></div>
+            <form method="post" action="{% url 'frontend:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="more-logout">🚪 خروج</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- FAB (Mobile) -->
+    <a class="fab" href="{% url 'frontend:invoice_create' %}" title="فاکتور جدید">+</a>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        {% if messages %}
+        <div class="toast-container" id="toasts">
+            {% for message in messages %}
+            <div class="toast {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/jalali.js"></script>
+    <script src="/static/js/date-scroller.js"></script>
+    <script src="/static/js/unit-select.js"></script>
+    <script src="/static/js/layout.js"></script>
+    <script>
+    /* ── Collapsible cards (accordion) ── */
+    document.addEventListener('click', function(e) {
+        const header = e.target.closest('.card[data-collapsible] .card-header');
+        if (!header) return;
+        const card = header.closest('.card[data-collapsible]');
+        if (card) card.classList.toggle('collapsed');
+    });
+
+    /* ── Captcha reload ── */
+    async function reloadCaptcha(btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        try {
+            const res = await fetch('/captcha/refresh/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            const row = btn.closest('.captcha-row');
+            if (row) {
+                const img = row.querySelector('.captcha-img');
+                const keyInput = row.querySelector('input[name="captcha_0"]');
+                const textInput = row.querySelector('input[name="captcha_1"]');
+                if (img) img.src = data.image_url;
+                if (keyInput) keyInput.value = data.key;
+                if (textInput) { textInput.value = ''; textInput.focus(); }
+            }
+        } catch (err) {
+            console.warn('[Captcha] reload failed:', err);
+        } finally {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
+    </script>
+    <script src="/static/js/offline-db.js"></script>
+    <script src="/static/js/sync-engine.js"></script>
+    <script src="/static/js/pwa-manager.js"></script>
+    {% block extra_js %}{% endblock %}
+
+    <script>
+    /* ── Password visibility toggle ── */
+    (function() {
+        function addToggle(input) {
+            if (input.dataset.pwToggle) return;
+            input.dataset.pwToggle = '1';
+
+            // Wrap input in a relative container
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'position:relative;display:inline-block;width:100%;';
+            input.parentNode.insertBefore(wrapper, input);
+            wrapper.appendChild(input);
+
+            // Make input full width with padding for the button
+            input.style.paddingLeft = '40px';
+
+            // Toggle button
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('aria-label', 'نمایش رمز');
+            btn.innerHTML = '👁';
+            btn.style.cssText = 'position:absolute;left:8px;top:50%;transform:translateY(-50%);' +
+                'background:none;border:none;cursor:pointer;font-size:18px;padding:4px;' +
+                'color:var(--text-muted);line-height:1;opacity:0.7;transition:opacity 0.2s;';
+            btn.addEventListener('mouseenter', () => btn.style.opacity = '1');
+            btn.addEventListener('mouseleave', () => btn.style.opacity = '0.7');
+            btn.addEventListener('click', () => {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                btn.innerHTML = isPassword ? '🙈' : '👁';
+                btn.setAttribute('aria-label', isPassword ? 'مخفی کردن رمز' : 'نمایش رمز');
+            });
+            wrapper.appendChild(btn);
+        }
+
+        // Apply to all existing password inputs
+        function scanPasswords() {
+            document.querySelectorAll('input[type="password"]').forEach(addToggle);
+        }
+
+        // Run on load and on DOM changes (for dynamically added forms)
+        scanPasswords();
+        if (window.MutationObserver) {
+            new MutationObserver(scanPasswords).observe(document.body, { childList: true, subtree: true });
+        }
+    })();
+    </script>
+</body>
+</html>

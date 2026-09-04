@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}محصول جدید — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{% if product %}ویرایش محصول{% else %}محصول جدید{% endif %}</h1>
+    <a href="{% url 'frontend:product_list' %}" class="btn btn-secondary">بازگشت</a>
+</div>
+<div class="card" style="max-width:600px;">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="form-group">
+            <label>نام کالا</label>
+            <input class="form-input" name="name" required value="{{ name|default:'' }}">
+        </div>
+        <div class="form-group">
+            <label>واحد</label>
+            <div id="unitContainer"></div>
+        </div>
+        <div class="form-group">
+            <label>دوره تکرار</label>
+            <select class="form-select" name="frequency">
+                <option value="">—</option>
+                {% for val, label in frequency_choices %}
+                <option value="{{ val }}"{% if frequency == val %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>قیمت اولیه (اختیاری)</label>
+            <input class="form-input" name="initial_price" type="number" min="0" dir="ltr" style="text-align:left;">
+        </div>
+        <div class="form-group">
+            <label>توضیحات</label>
+            <textarea class="form-input" name="description" rows="2">{{ description|default:'' }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">ذخیره</button>
+            <a href="{% url 'frontend:product_list' %}" class="btn btn-secondary">انصراف</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+    const container = document.getElementById('unitContainer');
+    const freqSelect = document.querySelector('[name="frequency"]');
+    const freqGrp = freqSelect.closest('.form-group');
+    function toggleFreq(){
+        const unit = container.querySelector('input[name="unit"]').value;
+        if (unit === 'خدمات') {
+            freqGrp.style.display = '';
+            freqSelect.required = true;
+        } else {
+            freqGrp.style.display = 'none';
+            freqSelect.required = false;
+            freqSelect.value = '';
+        }
+    }
+    window.toggleFreq = toggleFreq;
+    initUnitSelect(container, '{{ unit|default:"عدد" }}', 'unit').then(toggleFreq);
+})();
+</script>
+{% endblock %}

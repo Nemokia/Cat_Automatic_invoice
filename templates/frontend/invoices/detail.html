@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load jalali_tags %}
+{% load humanize %}
+{% block title %}{{ invoice.invoice_number }} — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ invoice.invoice_number }}</h1>
+    <div>
+        <a href="{% url 'frontend:invoice_edit' invoice.id %}" class="btn btn-secondary">ویرایش</a>
+        <a href="{% url 'frontend:invoice_print' invoice.id %}" class="btn btn-accent" target="_blank">چاپ</a>
+        <button onclick="shareInvoice()" class="btn btn-primary">اشتراک‌گذاری</button>
+        <a href="{% url 'frontend:invoice_list' %}" class="btn btn-secondary">بازگشت</a>
+    </div>
+</div>
+
+<div class="invoice-grid">
+    <!-- Customer Info -->
+    <div class="card">
+        <div class="card-header"><h3>مشتری</h3></div>
+        <p><strong>نام:</strong> {{ invoice.customer_name|default:"-" }}</p>
+        <p><strong>تلفن:</strong> {{ invoice.customer_phone|default:"-" }}</p>
+        {% if invoice.customer_address %}
+        <p><strong>آدرس:</strong> {{ invoice.customer_address }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Invoice Info -->
+    <div class="card">
+        <div class="card-header"><h3>اطلاعات فاکتور</h3></div>
+        <p><strong>شماره:</strong> {{ invoice.invoice_number }}</p>
+        <p><strong>تاریخ صدور:</strong> {{ invoice.invoice_date|jalali }}</p>
+        <p><strong>ساعت صدور:</strong> {{ invoice.created_at|jalali_datetime }}</p>
+        {% if invoice.due_date %}
+        <p><strong>سررسید:</strong> {{ invoice.due_date|jalali }}</p>
+        {% endif %}
+        <p><strong>وضعیت:</strong>
+            {% if invoice.is_paid %}
+            <span class="badge badge-success">پرداخت شده</span>
+            {% else %}
+            <span class="badge badge-warning">پرداخت نشده</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Items Table -->
+    <div class="card" style="grid-column: 1/-1;">
+        <div class="card-header"><h3>اقلام فاکتور</h3></div>
+        <div class="table-container">
+            <table>
+                <thead><tr>
+                    <th>ردیف</th><th>نام کالا</th><th>واحد</th><th>تعداد</th><th>قیمت واحد</th><th>مالیات</th><th>جمع</th>
+                </tr></thead>
+                <tbody>
+                {% for item in invoice.items.all %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><strong>{{ item.product_name }}</strong></td>
+                    <td>{{ item.unit }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.unit_price|intcomma }}</td>
+                    <td>{{ item.tax_rate }}%</td>
+                    <td><strong>{{ item.total_price|intcomma }} ریال</strong></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="card">
+        <div class="card-header"><h3>خلاصه مالی</h3></div>
+        <div class="totals-row"><span>جمع:</span><span class="amount-block">{{ invoice.subtotal|intcomma }} ریال<span class="toman">{{ invoice.subtotal|toman }} تومان</span></span></div>
+        {% if invoice.item_taxes_total %}
+        <div class="totals-row"><span>مالیات اقلام:</span><span class="amount-block">{{ invoice.item_taxes_total|intcomma }} ریال<span class="toman">{{ invoice.item_taxes_total|toman }} تومان</span></span></div>
+        {% endif %}
+        {% if invoice.invoice_tax_amount %}
+        <div class="totals-row"><span>مالیات فاکتور ({{ invoice.invoice_tax_rate }}%):</span><span class="amount-block">{{ invoice.invoice_tax_amount|intcomma }} ریال<span class="toman">{{ invoice.invoice_tax_amount|toman }} تومان</span></span></div>
+        {% endif %}
+        {% if invoice.discount_amount %}
+        <div class="totals-row"><span>تخفیف:</span><span class="amount-block">-{{ invoice.discount_amount|intcomma }} ریال<span class="toman">-{{ invoice.discount_amount|toman }} تومان</span></span></div>
+        {% endif %}
+        <div class="totals-row total"><span>مبلغ نهایی:</span><span class="amount-block">{{ invoice.final_amount|intcomma }} ریال<span class="toman">{{ invoice.final_amount|toman }} تومان</span></span></div>
+    </div>
+
+    <!-- Bank Info -->
+    {% if invoice.bank_name or invoice.card_number or invoice.iban %}
+    <div class="card">
+        <div class="card-header"><h3>اطلاعات بانکی</h3></div>
+        {% if invoice.bank_name %}<p><strong>بانک:</strong> {{ invoice.bank_name }}</p>{% endif %}
+        {% if invoice.card_number %}<p><strong>کارت:</strong> <span dir="ltr">{{ invoice.card_number }}</span></p>{% endif %}
+        {% if invoice.iban %}<p><strong>شبا:</strong> <span dir="ltr">{{ invoice.iban }}</span></p>{% endif %}
+        {% if invoice.account_holder %}<p><strong>صاحب حساب:</strong> {{ invoice.account_holder }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Notes -->
+    {% if invoice.notes %}
+    <div class="card" style="grid-column: 1/-1;">
+        <div class="card-header"><h3>توضیحات</h3></div>
+        <p>{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// Auto-trigger share popup if redirected with ?share=1
+(function() {
+    if (new URLSearchParams(window.location.search).get('share') === '1') {
+        // Clean URL
+        history.replaceState(null, '', window.location.pathname);
+        setTimeout(showShareModal, 500);
+    }
+})();
+
+function shareInvoice() {
+    showShareModal();
+}
+
+function showShareModal() {
+    const pdfUrl = "{% url 'frontend:invoice_pdf' invoice.id %}";
+    const invoiceNum = "{{ invoice.invoice_number }}";
+    const fileName = invoiceNum + ".pdf";
+
+    // Try native share API first (mobile) — share the actual PDF file
+    if (navigator.share) {
+        fetch(pdfUrl, { credentials: 'same-origin' }).then(r => {
+            if (!r.ok) throw new Error('خطا در دریافت PDF');
+            return r.blob();
+        }).then(blob => {
+            const file = new File([blob], fileName, {type: 'application/pdf'});
+            if (navigator.canShare && navigator.canShare({files: [file]})) {
+                return navigator.share({title: fileName, files: [file]});
+            }
+            // Fallback: share the PDF link
+            return navigator.share({
+                title: fileName,
+                text: 'فاکتور ' + invoiceNum,
+                url: window.location.origin + pdfUrl,
+            });
+        }).catch(() => {}).finally(() => {});
+        return;
+    }
+
+    // Desktop: show modal with app links (PDF file link)
+    let modal = document.getElementById('shareModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shareModal';
+        modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;';
+        modal.innerHTML = `
+            <div style="background:var(--surface);border-radius:12px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+                <h3 style="margin:0 0 16px;">ارسال فاکتور</h3>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <a id="shareWhatsApp" href="#" target="_blank" rel="noopener" class="btn btn-secondary" style="text-align:center;gap:8px;">📱 واتساپ</a>
+                    <a id="shareTelegram" href="#" target="_blank" rel="noopener" class="btn btn-secondary" style="text-align:center;gap:8px;">✈️ تلگرام</a>
+                    <button type="button" class="btn btn-secondary" onclick="copyShareLink()" id="shareCopyBtn" style="text-align:center;gap:8px;">📋 کپی لینک PDF</button>
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('shareModal').style.display='none'">بستن</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
+    }
+
+    const pdfLink = window.location.origin + pdfUrl;
+    const encodedLink = encodeURIComponent(pdfLink);
+    const encodedMsg = encodeURIComponent("فاکتور " + invoiceNum);
+
+    document.getElementById('shareWhatsApp').href = `https://wa.me/?text=${encodedMsg}%0A${encodedLink}`;
+    document.getElementById('shareTelegram').href = `https://t.me/share/url?url=${encodedLink}&text=${encodedMsg}`;
+    document.getElementById('shareModal').style.display = 'flex';
+}
+
+function copyShareLink() {
+    const pdfUrl = "{% url 'frontend:invoice_pdf' invoice.id %}";
+    const link = window.location.origin + pdfUrl;
+    navigator.clipboard.writeText(link).then(() => {
+        const btn = document.getElementById('shareCopyBtn');
+        btn.textContent = '✅ کپی شد';
+        setTimeout(() => { btn.textContent = '📋 کپی لینک'; }, 2000);
+    }).catch(() => {
+        // Fallback: select & copy
+        const ta = document.createElement('textarea');
+        ta.value = link;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    });
+}
+</script>
+{% endblock %}

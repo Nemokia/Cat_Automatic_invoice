@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}تنظیمات — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header"><h1>تنظیمات</h1></div>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="showSettingsTab('profile', this)">پروفایل</button>
+    <button class="tab-btn" onclick="showSettingsTab('seller', this)">اطلاعات فروشنده</button>
+    <button class="tab-btn" onclick="showSettingsTab('password', this)">تغییر رمز</button>
+</div>
+
+<!-- Profile -->
+<div id="tabProfile" class="card" style="max-width:600px;">
+    <div class="card-header"><h3>پروفایل کاربری</h3></div>
+    {% if not user.email %}
+    <div class="field-error" style="display:block;margin-bottom:12px;background:rgba(255,203,86,0.15);color:var(--warning);border-color:var(--warning);">
+        ⚠️ ایمیل ثبت نشده! برای بازیابی رمز عبور و ورود با کد یکبارمصرف، ایمیل خود را ثبت کنید.
+    </div>
+    {% endif %}
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="section" value="profile">
+        <div class="form-group">
+            <label for="id_first_name">نام</label>
+            <input class="form-input" type="text" id="id_first_name" name="first_name" value="{{ user.first_name }}">
+        </div>
+        <div class="form-group">
+            <label for="id_last_name">نام خانوادگی</label>
+            <input class="form-input" type="text" id="id_last_name" name="last_name" value="{{ user.last_name }}">
+        </div>
+        <div class="form-group">
+            <label for="id_email">ایمیل</label>
+            <input class="form-input" type="email" id="id_email" name="email" dir="ltr"
+                   placeholder="email@example.com" value="{{ user.email }}">
+            <small style="color:var(--text-muted);font-size:11px;display:block;margin-top:4px;">
+                ایمیل معتبر و دائمی وارد کنید (ایمیل‌های موقت پذیرفته نمی‌شوند)
+            </small>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+    </form>
+</div>
+
+<!-- Seller -->
+<div id="tabSeller" class="card" style="max-width:600px;display:none;">
+    <div class="card-header"><h3>اطلاعات فروشنده</h3></div>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="section" value="seller">
+        <div class="form-group">
+            <label for="id_business_name">نام کسب‌وکار</label>
+            <input class="form-input" type="text" id="id_business_name" name="business_name"
+                   value="{{ seller_profile.business_name|default:'' }}">
+        </div>
+        <div class="form-group">
+            <label for="id_national_id">شناسه ملی</label>
+            <input class="form-input" type="text" id="id_national_id" name="national_id"
+                   value="{{ seller_profile.national_id|default:'' }}">
+        </div>
+        <div class="form-group">
+            <label for="id_seller_address">آدرس</label>
+            <textarea class="form-input" id="id_seller_address" name="address" rows="2">{{ seller_profile.address|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="id_seller_phone">تلفن فروشنده</label>
+            <input class="form-input" type="text" id="id_seller_phone" name="seller_phone"
+                   dir="ltr" style="text-align:left;" value="{{ seller_profile.phone|default:'' }}">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+    </form>
+</div>
+
+<!-- Password -->
+<div id="tabPassword" class="card" style="max-width:600px;display:none;">
+    <div class="card-header"><h3>تغییر رمز عبور</h3></div>
+
+    {% if has_email %}
+    {# ── OTP-based password change ── #}
+    <div id="pwStep1">
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+            برای تغییر رمز عبور، ابتدا کد تأیید به ایمیل <strong>{{ user.email }}</strong> ارسال می‌شود.
+        </p>
+        <form method="post" id="pwOtpRequestForm">
+            {% csrf_token %}
+            <input type="hidden" name="section" value="password_otp_request">
+            <button type="submit" class="btn btn-primary">ارسال کد تأیید</button>
+        </form>
+    </div>
+
+    <div id="pwStep2" style="display:none;">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="section" value="password_otp_change">
+            <div class="form-group">
+                <label for="id_otp_code">کد تأیید ۵ رقمی</label>
+                <input class="form-input" type="text" id="id_otp_code" name="otp_code"
+                       required maxlength="5" pattern="\d{5}" dir="ltr"
+                       placeholder="XXXXX" autocomplete="one-time-code"
+                       inputmode="numeric" style="text-align:center;font-size:24px;letter-spacing:8px;">
+            </div>
+            <div class="form-group">
+                <label for="id_new_password">رمز عبور جدید</label>
+                <input class="form-input" type="password" id="id_new_password" name="new_password" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label for="id_confirm_password">تکرار رمز جدید</label>
+                <input class="form-input" type="password" id="id_confirm_password" name="confirm_password" required minlength="8">
+            </div>
+            {% if needs_captcha %}
+            <div class="form-group captcha-group">
+                <label>کد امنیتی (حاصل محاسبه را وارد کنید)</label>
+                <div class="captcha-row">
+                    <img src="{{ captcha_image_url }}" alt="captcha" class="captcha-img">
+                    <button type="button" class="captcha-reload" onclick="reloadCaptcha(this)" title="بارگذاری مجدد کد">🔄</button>
+                    <input class="form-input" type="text" name="captcha_1" required
+                           placeholder="؟" dir="ltr" inputmode="numeric" autocomplete="off">
+                    <input type="hidden" name="captcha_0" value="{{ captcha_key }}">
+                </div>
+            </div>
+            {% endif %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">تغییر رمز</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    // After OTP request form is submitted, show step 2
+    document.getElementById('pwOtpRequestForm').addEventListener('submit', function() {
+        // The page will reload with a success message, then we show step 2
+        localStorage.setItem('pw_otp_sent', '1');
+    });
+    if (localStorage.getItem('pw_otp_sent') === '1') {
+        document.getElementById('pwStep1').style.display = 'none';
+        document.getElementById('pwStep2').style.display = 'block';
+        localStorage.removeItem('pw_otp_sent');
+    }
+    </script>
+
+    {% else %}
+    {# ── No email: show warning + old-style password change ── #}
+    <div class="field-error" style="display:block;margin-bottom:16px;background:rgba(255,203,86,0.15);color:var(--warning);border-color:var(--warning);">
+        ⚠️ ایمیل ثبت نشده! امکان تغییر رمز با کد تأیید وجود ندارد. ابتدا ایمیل خود را در بخش پروفایل ثبت کنید.
+    </div>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="section" value="password">
+        <div class="form-group">
+            <label for="id_current_password">رمز عبور فعلی</label>
+            <input class="form-input" type="password" id="id_current_password" name="current_password" required>
+        </div>
+        <div class="form-group">
+            <label for="id_new_password">رمز عبور جدید</label>
+            <input class="form-input" type="password" id="id_new_password" name="new_password" required minlength="8">
+        </div>
+        <div class="form-group">
+            <label for="id_confirm_password">تکرار رمز جدید</label>
+            <input class="form-input" type="password" id="id_confirm_password" name="confirm_password" required minlength="8">
+        </div>
+        {% if needs_captcha %}
+        <div class="form-group captcha-group">
+            <label>کد امنیتی (حاصل محاسبه را وارد کنید)</label>
+            <div class="captcha-row">
+                <img src="{{ captcha_image_url }}" alt="captcha" class="captcha-img">
+                <button type="button" class="captcha-reload" onclick="reloadCaptcha(this)" title="بارگذاری مجدد کد">🔄</button>
+                <input class="form-input" type="text" name="captcha_1" required
+                       placeholder="؟" dir="ltr" inputmode="numeric" autocomplete="off">
+                <input type="hidden" name="captcha_0" value="{{ captcha_key }}">
+            </div>
+        </div>
+        {% endif %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">تغییر رمز</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+function showSettingsTab(name, btn) {
+    document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tabProfile').style.display = name === 'profile' ? '' : 'none';
+    document.getElementById('tabSeller').style.display = name === 'seller' ? '' : 'none';
+    document.getElementById('tabPassword').style.display = name === 'password' ? '' : 'none';
+}
+</script>
+{% endblock %}
+{% endblock %}

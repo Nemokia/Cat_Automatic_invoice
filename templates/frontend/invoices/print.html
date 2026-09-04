@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+{% load jalali_tags %}
+{% load humanize %}
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>چاپ فاکتور {{ invoice.invoice_number }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --dark:    #092328;
+            --teal:    #12544F;
+            --green:   #2A835F;
+            --mint:    #8BBB92;
+            --mint-bg: #eaf5ec;
+            --white:   #ffffff;
+        }
+
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            direction: rtl;
+            background: var(--white);
+            color: var(--dark);
+            padding: 0;
+        }
+
+        /* ── Header band ── */
+        .header {
+            background: linear-gradient(135deg, var(--dark) 0%, var(--teal) 100%);
+            color: var(--white);
+            padding: 28px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .brand { display: flex; align-items: center; gap: 12px; }
+        .header .brand h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+        .header .brand .logo { font-size: 28px; }
+        .header .brand .inv-num {
+            background: rgba(255,255,255,.15);
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        .header .meta { text-align: left; font-size: 13px; line-height: 1.9; opacity: .92; }
+        .header .meta strong { font-weight: 700; }
+
+        /* ── Info boxes ── */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 24px 32px 0;
+        }
+        .info-box {
+            border: 1px solid var(--mint);
+            border-radius: 10px;
+            padding: 16px 18px;
+            background: var(--mint-bg);
+        }
+        .info-box h3 {
+            color: var(--teal);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--mint);
+        }
+        .info-box p { font-size: 13px; line-height: 2; }
+        .info-box strong { color: var(--dark); }
+
+        /* ── Table ── */
+        .table-wrap { padding: 20px 32px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 14px; font-size: 13px; text-align: right; }
+        th {
+            background: var(--teal);
+            color: var(--white);
+            font-weight: 700;
+            font-size: 12px;
+        }
+        th:first-child { border-radius: 0 8px 0 0; }
+        th:last-child  { border-radius: 8px 0 0 0; }
+        td { border-bottom: 1px solid #e0e0e0; }
+        tbody tr:nth-child(even) { background: var(--mint-bg); }
+        tbody tr:hover { background: #d8eede; }
+
+        /* ── Totals ── */
+        .totals-wrap { padding: 20px 32px 0; display: flex; justify-content: flex-end; }
+        .totals { width: 340px; }
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            font-size: 13px;
+            border-bottom: 1px dashed var(--mint);
+        }
+        .totals-row.total {
+            font-weight: 800;
+            font-size: 16px;
+            border-top: 3px solid var(--green);
+            border-bottom: none;
+            padding-top: 10px;
+            margin-top: 4px;
+            color: var(--green);
+        }
+        .amount-block { text-align: left; }
+        .amount-block .toman { font-size: 11px; color: #888; display: block; margin-top: 1px; }
+
+        /* ── Bank / Notes ── */
+        .section-box {
+            margin: 20px 32px 0;
+            padding: 14px 18px;
+            border: 1px solid var(--mint);
+            border-radius: 10px;
+            background: var(--mint-bg);
+            font-size: 13px;
+            line-height: 2;
+        }
+        .section-box strong { color: var(--teal); }
+
+        /* ── Footer ── */
+        .footer {
+            margin-top: 28px;
+            padding: 14px 32px;
+            background: var(--dark);
+            color: rgba(255,255,255,.7);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        @media print {
+            body { padding: 0; }
+            .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            th      { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .info-box, .section-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="brand">
+            <span class="logo">🐱</span>
+            <div>
+                <h1>Cat Invoice</h1>
+                <span class="inv-num">{{ invoice.invoice_number }}</span>
+            </div>
+        </div>
+        <div class="meta">
+            <div><strong>تاریخ صدور:</strong> {{ invoice.invoice_date|jalali }}</div>
+            <div><strong>ساعت صدور:</strong> {{ invoice.created_at|jalali_datetime }}</div>
+            {% if invoice.due_date %}<div><strong>سررسید:</strong> {{ invoice.due_date|jalali }}</div>{% endif %}
+        </div>
+    </div>
+
+    <!-- Info boxes -->
+    <div class="info-grid">
+        <div class="info-box">
+            <h3>👤 مشتری</h3>
+            <p>
+                <strong>{{ invoice.customer_name|default:"-" }}</strong><br>
+                {% if invoice.customer_phone %}📞 {{ invoice.customer_phone }}<br>{% endif %}
+                {% if invoice.customer_address %}📍 {{ invoice.customer_address }}{% endif %}
+            </p>
+        </div>
+        <div class="info-box">
+            <h3>🏢 فروشنده</h3>
+            <p>
+                {% if invoice.seller_name %}<strong>{{ invoice.seller_name }}</strong><br>{% endif %}
+                {% if invoice.seller_business %}کسب‌وکار: {{ invoice.seller_business }}<br>{% endif %}
+                {% if invoice.seller_phone %}📞 {{ invoice.seller_phone }}{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Items table -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>#</th><th>نام کالا</th><th>واحد</th><th>تعداد</th><th>قیمت واحد</th><th>مالیات</th><th>جمع</th>
+            </tr></thead>
+            <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><strong>{{ item.product_name }}</strong></td>
+                <td>{{ item.unit }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit_price|intcomma }}</td>
+                <td>{{ item.tax_rate }}%</td>
+                <td><strong>{{ item.total_price|intcomma }}</strong></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Totals -->
+    <div class="totals-wrap">
+        <div class="totals">
+            <div class="totals-row"><span>جمع:</span><span class="amount-block">{{ invoice.subtotal|intcomma }} ریال<span class="toman">{{ invoice.subtotal|toman }} تومان</span></span></div>
+            {% if invoice.item_taxes_total %}
+            <div class="totals-row"><span>مالیات اقلام:</span><span class="amount-block">{{ invoice.item_taxes_total|intcomma }} ریال<span class="toman">{{ invoice.item_taxes_total|toman }} تومان</span></span></div>
+            {% endif %}
+            {% if invoice.invoice_tax_amount %}
+            <div class="totals-row"><span>مالیات ({{ invoice.invoice_tax_rate }}%):</span><span class="amount-block">{{ invoice.invoice_tax_amount|intcomma }} ریال<span class="toman">{{ invoice.invoice_tax_amount|toman }} تومان</span></span></div>
+            {% endif %}
+            {% if invoice.discount_amount %}
+            <div class="totals-row"><span>تخفیف:</span><span class="amount-block">-{{ invoice.discount_amount|intcomma }} ریال<span class="toman">-{{ invoice.discount_amount|toman }} تومان</span></span></div>
+            {% endif %}
+            <div class="totals-row total"><span>مبلغ نهایی:</span><span class="amount-block">{{ invoice.final_amount|intcomma }} ریال<span class="toman">{{ invoice.final_amount|toman }} تومان</span></span></div>
+        </div>
+    </div>
+
+    <!-- Bank info -->
+    {% if invoice.bank_name or invoice.card_number %}
+    <div class="section-box">
+        <strong>🏦 اطلاعات بانکی:</strong>
+        {% if invoice.bank_name %}بانک: {{ invoice.bank_name }} | {% endif %}
+        {% if invoice.card_number %}کارت: {{ invoice.card_number }} | {% endif %}
+        {% if invoice.iban %}شبا: {{ invoice.iban }} | {% endif %}
+        {% if invoice.account_holder %}صاحب حساب: {{ invoice.account_holder }}{% endif %}
+    </div>
+    {% endif %}
+
+    {% if invoice.notes %}
+    <div class="section-box" style="margin-top:10px;">
+        <strong>📝 توضیحات:</strong> {{ invoice.notes }}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="footer">
+        🐱 Cat Invoice — صورتحساب رسمی
+    </div>
+
+    <script>window.onload = () => window.print();</script>
+</body>
+</html>

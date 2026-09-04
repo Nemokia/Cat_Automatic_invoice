@@ -2,10 +2,20 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import FileResponse
 from rest_framework_simplejwt.views import TokenRefreshView
+
+
+def service_worker_view(request):
+    """Serve sw.js from root for proper scope."""
+    sw_path = settings.STATICFILES_DIRS[0] / 'sw.js'
+    return FileResponse(open(sw_path, 'rb'), content_type='application/javascript')
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('sw.js', service_worker_view, name='service-worker'),
+    path('captcha/', include('captcha.urls')),
     # API
     path('api/auth/', include('accounts.urls')),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),

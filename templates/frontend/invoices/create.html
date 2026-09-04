@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}فاکتور جدید — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 id="invFormTitle">{% if invoice %}ویرایش فاکتور{% else %}فاکتور جدید{% endif %}</h1>
+    <a href="{% url 'frontend:invoice_list' %}" class="btn btn-secondary">بازگشت</a>
+</div>
+
+<form id="invoiceForm" method="post" action="{% url 'frontend:invoice_create' %}" novalidate>
+{% csrf_token %}
+{% if invoice %}<input type="hidden" name="invoice_id" value="{{ invoice.id }}">{% endif %}
+
+<div class="invoice-grid">
+    <!-- Customer -->
+    <div class="card" data-collapsible>
+        <div class="card-header"><h3>مشتری</h3></div>
+        <div class="card-body">
+        <div class="form-group">
+            <label>نام و نام خانوادگی</label>
+            <div class="autocomplete-wrapper">
+                <input class="form-input" id="invCustName" name="customer_name"
+                       placeholder="نام مشتری را وارد یا جستجو کنید..." autocomplete="off"
+                       value="{{ invoice.customer_name|default:'' }}">
+                <div class="autocomplete-list" id="invCustNameList"></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>شماره تماس</label>
+            <div class="autocomplete-wrapper">
+                <input class="form-input" id="invCustPhone" name="customer_phone"
+                       placeholder="شماره تماس (اختیاری)" maxlength="15" dir="ltr"
+                       style="text-align:left;" autocomplete="off" inputmode="tel"
+                       value="{{ invoice.customer_phone|default:'' }}">
+                <div class="autocomplete-list" id="invCustPhoneList"></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>آدرس (اختیاری)</label>
+            <textarea class="form-input" id="invCustAddress" name="customer_address" rows="2"
+                      placeholder="آدرس مشتری">{{ invoice.customer_address|default:'' }}</textarea>
+        </div>
+        <input type="hidden" id="invCustId" name="customer" value="{{ invoice.customer_id|default:'' }}">
+        </div>
+    </div>
+
+    <!-- Dates + Status -->
+    <div class="card" data-collapsible>
+        <div class="card-header"><h3>تاریخ و وضعیت</h3></div>
+        <div class="card-body">
+        <div class="form-group">
+            <label>تاریخ فاکتور</label>
+            <input type="hidden" id="invDateHidden" name="invoice_date"
+                   value="{{ invoice.invoice_date|default:'' }}">
+            <input class="form-input jalali-display" id="invDate" readonly required
+                   placeholder="انتخاب تاریخ..."
+                   onclick="openDateScroller('invDate','invDateHidden')">
+        </div>
+        <div class="form-group">
+            <label>تاریخ سررسید</label>
+            <input type="hidden" id="invDueHidden" name="due_date"
+                   value="{{ invoice.due_date|default:'' }}">
+            <input class="form-input jalali-display" id="invDue" readonly
+                   placeholder="انتخاب تاریخ..."
+                   onclick="openDateScroller('invDue','invDueHidden')">
+        </div>
+        <div class="form-group">
+            <label>مالیات فاکتور (%)</label>
+            <input class="form-input" type="number" id="invTaxRate" name="invoice_tax_rate"
+                   min="0" max="100" step="0.01" value="{{ invoice.invoice_tax_rate|default:'0' }}"
+                   oninput="recalcInvoice()">
+        </div>
+        <div class="form-group">
+            <label>نوع تخفیف</label>
+            <select class="form-select" id="invDiscType" name="discount_type" onchange="recalcInvoice()">
+                <option value="">بدون تخفیف</option>
+                <option value="percent" {% if invoice.discount_type == 'percent' %}selected{% endif %}>درصد</option>
+                <option value="amount" {% if invoice.discount_type == 'amount' %}selected{% endif %}>مبلغ</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>مقدار تخفیف</label>
+            <input class="form-input" type="number" id="invDiscVal" name="discount_value"
+                   min="0" step="1" value="{{ invoice.discount_value|default:'0' }}" oninput="recalcInvoice()">
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="invPaid" name="is_paid" {% if invoice.is_paid %}checked{% endif %}>
+                پرداخت شده
+            </label>
+        </div>
+        </div>
+    </div>
+
+    <!-- Bank Info -->
+    <div class="card" data-collapsible>
+        <div class="card-header"><h3>اطلاعات بانکی</h3></div>
+        <div class="card-body">
+        <div class="bank-fields-grid">
+            <div class="form-group">
+                <label>حساب بانکی ذخیره‌شده</label>
+                <select class="form-select" id="invBankAcct" onchange="fillBankInfo()">
+                    <option value="">انتخاب حساب ذخیره‌شده...</option>
+                    {% for acct in banks %}
+                    <option value="{{ acct.id }}"
+                            data-bank_name="{{ acct.bank.name }}"
+                            data-card_number="{{ acct.card_number }}"
+                            data-iban="{{ acct.iban }}"
+                            data-account_holder="{{ acct.account_holder }}">
+                        {{ acct.bank.name }} — {{ acct.card_number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>نام بانک</label>
+                <div class="autocomplete-wrapper">
+                    <input class="form-input" id="invBankName" name="bank_name"
+                           placeholder="نام بانک (اختیاری)" autocomplete="off"
+                           value="{{ invoice.bank_name|default:'' }}">
+                    <div class="autocomplete-list" id="invBankNameList"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>شماره کارت</label>
+                <div class="autocomplete-wrapper">
+                    <input class="form-input" id="invCard" name="card_number"
+                           placeholder="شماره کارت (اختیاری)" maxlength="16" dir="ltr"
+                           style="text-align:left;" autocomplete="off"
+                           value="{{ invoice.card_number|default:'' }}">
+                    <div class="autocomplete-list" id="invCardList"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>صاحب حساب</label>
+                <div class="autocomplete-wrapper">
+                    <input class="form-input" id="invHolder" name="account_holder"
+                           placeholder="صاحب حساب (اختیاری)" autocomplete="off"
+                           value="{{ invoice.account_holder|default:'' }}">
+                    <div class="autocomplete-list" id="invHolderList"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>شماره شبا</label>
+                <input class="form-input" id="invIban" name="iban"
+                       placeholder="شماره شبا (اختیاری)" maxlength="30" dir="ltr"
+                       style="text-align:left;" value="{{ invoice.iban|default:'' }}">
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card" style="grid-column: 1 / -1;" data-collapsible>
+        <div class="card-header">
+            <h3>اقلام فاکتور</h3>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); addInvoiceItem()">+ افزودن قلم</button>
+        </div>
+        <div class="card-body">
+        <div class="items-table-wrapper">
+            <table class="items-table" id="itemsTable">
+                <thead><tr>
+                    <th class="col-num">#</th>
+                    <th class="col-name">نام کالا</th>
+                    <th class="col-unit">واحد</th>
+                    <th class="col-freq">دوره</th>
+                    <th class="col-qty">تعداد</th>
+                    <th class="col-price">قیمت واحد</th>
+                    <th class="col-tax">مالیات%</th>
+                    <th class="col-total">جمع</th>
+                    <th class="col-action"></th>
+                </tr></thead>
+                <tbody id="invItemsBody">
+                </tbody>
+            </table>
+        </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card" style="grid-column: 1 / -1;" data-collapsible>
+        <div class="card-header"><h3>توضیحات</h3></div>
+        <div class="card-body">
+        <textarea class="form-input" name="notes" rows="2"
+                  placeholder="توضیحات اختیاری">{{ invoice.notes|default:'' }}</textarea>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+        <div class="card-header"><h3>خلاصه</h3></div>
+        <div class="totals-row"><span>جمع:</span><span id="tSubtotal">۰ ریال<br><small class="toman">۰ تومان</small></span></div>
+        <div class="totals-row"><span>مالیات اقلام:</span><span id="tItemTax">۰ ریال<br><small class="toman">۰ تومان</small></span></div>
+        <div class="totals-row"><span>مالیات فاکتور:</span><span id="tInvTax">۰ ریال<br><small class="toman">۰ تومان</small></span></div>
+        <div class="totals-row"><span>تخفیف:</span><span id="tDiscount">۰ ریال<br><small class="toman">۰ تومان</small></span></div>
+        <div class="totals-row total"><span>مبلغ نهایی:</span><span id="tFinal">۰ ریال<br><small class="toman">۰ تومان</small></span></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card invoice-actions-sticky" style="grid-column: 1 / -1;">
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">ذخیره فاکتور</button>
+            <button type="submit" formaction="{% url 'frontend:invoice_create' %}?print=1" class="btn btn-secondary">🖨️ ذخیره و چاپ فاکتور</button>
+            <button type="submit" formaction="{% url 'frontend:invoice_create' %}?share=1" data-share="1" class="btn btn-accent">📤 ذخیره و ارسال</button>
+            <a href="{% url 'frontend:invoice_list' %}" class="btn btn-secondary">انصراف</a>
+        </div>
+    </div>
+    <input type="hidden" id="custUpdateExisting" name="customer_update_existing" value="">
+    <input type="hidden" id="custCreateNew" name="customer_create_new" value="">
+</div>
+</form>
+
+<!-- Customer match conflict modal -->
+<div id="custMatchModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <h3 style="margin:0 0 16px;">مشتری مشابهی پیدا شد</h3>
+    <div id="custMatchStatus" style="font-size:13px;color:var(--text-muted);margin-bottom:8px;"></div>
+    <div id="custMatchInfo" style="background:var(--surface-elevated,#13393f);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button type="button" class="btn btn-primary" onclick="custMatchResolve('same')">بله، همان مشتری است (به‌روزرسانی اطلاعات)</button>
+      <button type="button" class="btn btn-secondary" onclick="custMatchResolve('new')">خیر، مشتری جدید است</button>
+      <button type="button" class="btn btn-secondary" onclick="custMatchResolve('cancel')">لغو</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/jalali.js"></script>
+<script src="/static/js/date-scroller.js"></script>
+<script src="/static/js/invoice-form.js"></script>
+<script>
+// Initialize form on load — combined submit: customer conflict check + item serialize
+(function() {
+    const form = document.getElementById('invoiceForm');
+    let _custMatchResolve = null;
+
+    const STATUS_MSGS = {
+        phone_conflict: 'شماره تلفن واردشده قبلاً برای مشتری دیگری ثبت شده است.',
+        name_conflict: 'نام واردشده مشابه مشتری موجود است اما شماره تلفن متفاوت است.',
+        similar: 'مشتری مشابهی با اطلاعات نزدیک یافت شد.',
+        exact: 'مشتری دقیقاً مشابهی یافت شد.',
+    };
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Reset conflict flags
+        document.getElementById('custUpdateExisting').value = '';
+        document.getElementById('custCreateNew').value = '';
+
+        // 1) Check customer conflict (when name or phone present)
+        const custId = document.getElementById('invCustId').value;
+        const name = document.getElementById('invCustName').value.trim();
+        const phone = document.getElementById('invCustPhone').value.trim();
+
+        if (name || phone) {
+            try {
+                const res = await fetch(`/search/customers/check-similar/?name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}`, {
+                    headers: { 'X-CSRFToken': getCsrfToken() }
+                });
+                const data = await res.json();
+
+                if (data.status === 'exact' && data.primary) {
+                    // Exact match — auto-link without popup
+                    document.getElementById('invCustId').value = data.primary.id;
+                } else if (data.status !== 'none' && data.primary) {
+                    // Conflict — show popup
+                    const decision = await showCustMatchModal(data);
+                    if (decision === 'cancel') return;
+                    if (decision === 'same') {
+                        document.getElementById('invCustId').value = data.primary.id;
+                        document.getElementById('custUpdateExisting').value = '1';
+                    } else if (decision === 'new') {
+                        document.getElementById('invCustId').value = '';
+                        document.getElementById('custCreateNew').value = '1';
+                    }
+                }
+            } catch(err) { /* proceed on network error */ }
+        }
+
+        // 2) Serialize item rows into hidden inputs
+        prepareInvoiceSubmit(e);
+
+        // 3) "ذخیره و ارسال" — save via AJAX on this page, then share the PDF
+        //    (no navigation to the detail page)
+        if (e.submitter && e.submitter.dataset.share === '1') {
+            await submitAndShare(form, e.submitter);
+            return;
+        }
+
+        // 4) Submit the form normally
+        form.submit();
+    });
+
+    // Modal helpers (Promise-based)
+    window.showCustMatchModal = function(data) {
+        return new Promise(resolve => {
+            _custMatchResolve = resolve;
+            const modal = document.getElementById('custMatchModal');
+            const info = document.getElementById('custMatchInfo');
+            const statusEl = document.getElementById('custMatchStatus');
+            const p = data.primary;
+            const status = data.status;
+
+            // Show conflict type explanation
+            statusEl.textContent = STATUS_MSGS[status] || '';
+
+            // Show existing customer info
+            let html = `<div><strong>${escHtml(p.full_name)}</strong></div>`;
+            html += `<div style="margin-top:4px;color:var(--text-muted);">${escHtml(p.phone || 'بدون تلفن')}</div>`;
+            if (p.address) html += `<div style="margin-top:4px;color:var(--text-muted);font-size:13px;">${escHtml(p.address)}</div>`;
+            if (data.candidates && data.candidates.length > 1) {
+                html += `<div style="margin-top:8px;font-size:12px;color:var(--text-muted);">${data.candidates.length - 1} مشتری مشابه دیگر نیز یافت شد</div>`;
+            }
+            info.innerHTML = html;
+            modal.style.display = 'flex';
+        });
+    };
+
+    window.custMatchResolve = function(action) {
+        document.getElementById('custMatchModal').style.display = 'none';
+        if (_custMatchResolve) { _custMatchResolve(action); _custMatchResolve = null; }
+    };
+})();
+
+// Load units cache for item row selects
+fetchUnits().then(u => { _unitsCache = u; renderItems(); });
+
+// Initialize Jalali date displays from hidden ISO values
+['invDate','invDue'].forEach(id => {
+    const hidden = document.getElementById(id+'Hidden');
+    const display = document.getElementById(id);
+    if (hidden && display && hidden.value) {
+        const j = Jalali.fromISO(hidden.value);
+        if (j) display.value = Jalali.format(j);
+    }
+});
+
+// Default invoice date to today if empty (new invoice only)
+(function() {
+    const h = document.getElementById('invDateHidden');
+    const d = document.getElementById('invDate');
+    if (h && d && !h.value) {
+        const today = Jalali.today();
+        h.value = Jalali.toISO(today);
+        d.value = Jalali.format(today);
+    }
+})();
+
+// Customer autocomplete
+document.getElementById('invCustName').addEventListener('input', function() {
+    searchCustomers('name', this.value);
+});
+document.getElementById('invCustPhone').addEventListener('input', function() {
+    searchCustomers('phone', this.value);
+});
+
+// Bank account autocomplete — show all on focus
+document.getElementById('invBankName').addEventListener('input', function() {
+    searchBankAccounts('name', this.value);
+});
+document.getElementById('invBankName').addEventListener('focus', function() {
+    searchBankAccounts('name', this.value);
+});
+document.getElementById('invCard').addEventListener('input', function() {
+    searchBankAccounts('card', this.value);
+});
+document.getElementById('invCard').addEventListener('focus', function() {
+    searchBankAccounts('card', this.value);
+});
+document.getElementById('invHolder').addEventListener('input', function() {
+    searchBankAccounts('holder', this.value);
+});
+document.getElementById('invHolder').addEventListener('focus', function() {
+    searchBankAccounts('holder', this.value);
+});
+
+// Start with 3 empty item rows for new invoices
+{% if not invoice %}
+for (let i = 0; i < 3; i++) addInvoiceItem();
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load jalali_tags %}
+{% load humanize %}
+{% block title %}فاکتورها — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>فاکتورها</h1>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <a href="{% url 'frontend:report_export_excel' %}?sections=invoices&sections=items{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-secondary" title="خروجی اکسل">📥 اکسل</a>
+        <a href="{% url 'frontend:invoice_create' %}" class="btn btn-primary">+ فاکتور جدید</a>
+    </div>
+</div>
+
+<div class="search-bar">
+    <form method="get" action="{% url 'frontend:invoice_list' %}" style="display:flex;gap:8px;max-width:460px;flex:1;">
+        <input class="form-input" placeholder="جستجو: شماره فاکتور، مشتری، تلفن، بانک..." name="search"
+               value="{{ search_query }}" style="flex:1;">
+        <button type="submit" class="btn btn-secondary">🔍</button>
+        {% if search_query %}<a href="{% url 'frontend:invoice_list' %}" class="btn btn-secondary">✕</a>{% endif %}
+    </form>
+</div>
+
+{% if invoices %}
+<form id="bulkDeleteForm" method="post" action="{% url 'frontend:invoice_bulk_delete' %}">
+{% csrf_token %}
+<div id="bulkActions" style="display:none;margin-bottom:12px;">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('آیا از حذف دسته‌ای اطمینان دارید؟')">حذف انتخاب شده</button>
+    <span id="selectedCount"></span>
+</div>
+<div class="table-container desktop-only">
+    <table id="invoiceTable">
+        <thead><tr>
+            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+            <th>شماره</th><th>مشتری</th><th>تاریخ</th><th>ساعت صدور</th><th>مبلغ</th><th>وضعیت</th><th>عملیات</th>
+        </tr></thead>
+        <tbody>
+        {% for inv in invoices %}
+        <tr>
+            <td><input type="checkbox" name="invoice_ids" value="{{ inv.id }}" class="inv-checkbox" onchange="updateBulkActions()"></td>
+            <td><strong>{{ inv.invoice_number }}</strong></td>
+            <td>{{ inv.customer_name|default:"-" }}</td>
+            <td>{{ inv.invoice_date|jalali }}</td>
+            <td>{{ inv.created_at|jalali_datetime }}</td>
+            <td><strong>{{ inv.final_amount|intcomma }} ریال</strong></td>
+            <td>
+                {% if inv.is_paid %}
+                <span class="badge badge-success">پرداخت شده</span>
+                {% else %}
+                <span class="badge badge-warning">پرداخت نشده</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{% url 'frontend:invoice_detail' inv.id %}" class="btn btn-sm btn-secondary">مشاهده</a>
+                <a href="{% url 'frontend:invoice_edit' inv.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+                <a href="{% url 'frontend:invoice_print' inv.id %}" class="btn btn-sm btn-accent" target="_blank">چاپ</a>
+                <form method="post" action="{% url 'frontend:invoice_delete' inv.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('آیا از حذف این فاکتور اطمینان دارید؟')">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+</form>
+
+<div class="mobile-cards mobile-only">
+    {% for inv in invoices %}
+    <div class="mobile-card">
+        <div class="mobile-card-header">
+            <strong>{{ inv.invoice_number }}</strong>
+            {% if inv.is_paid %}
+            <span class="badge badge-success">پرداخت شده</span>
+            {% else %}
+            <span class="badge badge-warning">پرداخت نشده</span>
+            {% endif %}
+        </div>
+        <div class="mobile-card-body">
+            <div class="mobile-card-row">
+                <span class="card-label">مشتری</span>
+                <span>{{ inv.customer_name|default:"-" }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">تاریخ</span>
+                <span>{{ inv.invoice_date|jalali }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">ساعت صدور</span>
+                <span>{{ inv.created_at|jalali_datetime }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">مبلغ</span>
+                <strong>{{ inv.final_amount|intcomma }} ریال</strong>
+            </div>
+        </div>
+        <div class="mobile-card-actions">
+            <a href="{% url 'frontend:invoice_detail' inv.id %}" class="btn btn-sm btn-secondary">مشاهده</a>
+            <a href="{% url 'frontend:invoice_edit' inv.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+            <a href="{% url 'frontend:invoice_print' inv.id %}" class="btn btn-sm btn-accent" target="_blank">چاپ</a>
+            <form method="post" action="{% url 'frontend:invoice_delete' inv.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('آیا از حذف این فاکتور اطمینان دارید؟')">حذف</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% include "frontend/includes/pagination.html" %}
+{% else %}
+<div class="empty-state">
+    <div class="icon">📄</div>
+    {% if search_query %}
+    <p>نتیجه‌ای برای «{{ search_query }}» یافت نشد</p>
+    <a href="{% url 'frontend:invoice_list' %}" class="btn btn-secondary" style="margin-top:12px;">حذف جستجو</a>
+    {% else %}
+    <p>فاکتوری یافت نشد</p>
+    <a href="{% url 'frontend:invoice_create' %}" class="btn btn-primary" style="margin-top:12px;">اولین فاکتور را بسازید</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% block extra_js %}
+<script>
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.inv-checkbox').forEach(c => c.checked = cb.checked);
+    updateBulkActions();
+}
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.inv-checkbox:checked').length;
+    const bar = document.getElementById('bulkActions');
+    const cnt = document.getElementById('selectedCount');
+    if (checked > 0) {
+        bar.style.display = 'block';
+        cnt.textContent = checked + ' مورد انتخاب شده';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+{% load jalali_tags %}
+{% load humanize %}
+{% block title %}گزارش‌ها — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>گزارش‌ها</h1>
+</div>
+
+<div class="tabs">
+    <a href="?type=sales" class="tab-btn {% if report_type == 'sales' %}active{% endif %}">فروش</a>
+    <a href="?type=customers" class="tab-btn {% if report_type == 'customers' %}active{% endif %}">مشتریان</a>
+    <a href="?type=products" class="tab-btn {% if report_type == 'products' %}active{% endif %}">محصولات</a>
+</div>
+
+{% if report_type == 'sales' %}
+<div class="card">
+    <div class="card-header"><h3>گزارش فروش</h3></div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📄</div>
+            <div class="stat-info">
+                <div class="value">{{ total_count }}</div>
+                <div class="label">کل فاکتورها</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-info">
+                <div class="value">{{ total_revenue|intcomma }} ریال</div>
+                <div class="label">مجموع فروش</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+                <div class="value">{{ paid_count }}</div>
+                <div class="label">پرداخت شده</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-info">
+                <div class="value">{{ unpaid_count }}</div>
+                <div class="label">پرداخت نشده</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if product_revenue %}
+<div class="card">
+    <div class="card-header"><h3>سهم محصولات از فروش</h3></div>
+    <div class="pie-chart-wrap">
+        <canvas id="productPie" aria-label="نمودار سهم محصولات"></canvas>
+    </div>
+    <script id="productRevenueData" type="application/json">{{ product_revenue|json_script_safe }}</script>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h3>گزارش ماهانه</h3></div>
+    {% if monthly_sales %}
+    <div id="monthlyTableWrap" data-page-size="10">
+        <div class="table-container desktop-only">
+            <table>
+                <thead><tr><th>ماه</th><th>تعداد</th><th>مجموع</th></tr></thead>
+                <tbody id="monthlyTbody">
+                {% for m in monthly_sales %}
+                <tr data-pag-item>
+                    <td><strong>{{ m.month|jalali }}</strong></td>
+                    <td>{{ m.count }}</td>
+                    <td>{{ m.revenue|intcomma }} ریال</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mobile-cards mobile-only" id="monthlyMobile">
+            {% for m in monthly_sales %}
+            <div class="mobile-card" data-pag-item>
+                <div class="mobile-card-header"><strong>{{ m.month|jalali }}</strong></div>
+                <div class="mobile-card-body">
+                    <div class="mobile-card-row"><span class="card-label">تعداد</span><span>{{ m.count }} فاکتور</span></div>
+                    <div class="mobile-card-row"><span class="card-label">مجموع</span><strong>{{ m.revenue|intcomma }} ریال</strong></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="pag-bar" data-pag-bar></div>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>داده‌ای نیست</p></div>
+    {% endif %}
+</div>
+
+{% elif report_type == 'customers' %}
+<div class="card">
+    <div class="card-header"><h3>گزارش مشتریان</h3></div>
+    {% if customer_stats %}
+    <div id="customerTableWrap" data-page-size="10">
+        <div class="table-container desktop-only">
+            <table>
+                <thead><tr><th>نام</th><th>تلفن</th><th>تعداد فاکتور</th><th>مجموع خرید</th></tr></thead>
+                <tbody id="customerTbody">
+                {% for c in customer_stats %}
+                <tr data-pag-item>
+                    <td><strong>{{ c.full_name }}</strong></td>
+                    <td dir="ltr" style="text-align:left;">{{ c.phone|default:"-" }}</td>
+                    <td>{{ c.num_invoices }}</td>
+                    <td>{{ c.total_spent|intcomma }} ریال</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mobile-cards mobile-only" id="customerMobile">
+            {% for c in customer_stats %}
+            <div class="mobile-card" data-pag-item>
+                <div class="mobile-card-header"><strong>{{ c.full_name }}</strong></div>
+                <div class="mobile-card-body">
+                    <div class="mobile-card-row"><span class="card-label">تلفن</span><span>{{ c.phone|default:"-" }}</span></div>
+                    <div class="mobile-card-row"><span class="card-label">فاکتورها</span><span>{{ c.num_invoices }}</span></div>
+                    <div class="mobile-card-row"><span class="card-label">مجموع</span><strong>{{ c.total_spent|intcomma }} ریال</strong></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="pag-bar" data-pag-bar></div>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>داده‌ای نیست</p></div>
+    {% endif %}
+</div>
+
+{% elif report_type == 'products' %}
+<div class="card">
+    <div class="card-header"><h3>گزارش محصولات</h3></div>
+    {% if product_stats %}
+    <div id="productTableWrap" data-page-size="10">
+        <div class="table-container desktop-only">
+            <table>
+                <thead><tr><th>نام</th><th>فروش</th><th>درآمد</th></tr></thead>
+                <tbody id="productTbody">
+                {% for p in product_stats %}
+                <tr data-pag-item>
+                    <td><strong>{{ p.product.name }}</strong></td>
+                    <td>{{ p.total_sold }}</td>
+                    <td>{{ p.total_revenue|intcomma }} ریال</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mobile-cards mobile-only" id="productMobile">
+            {% for p in product_stats %}
+            <div class="mobile-card" data-pag-item>
+                <div class="mobile-card-header"><strong>{{ p.product.name }}</strong></div>
+                <div class="mobile-card-body">
+                    <div class="mobile-card-row"><span class="card-label">فروش</span><span>{{ p.total_sold }}</span></div>
+                    <div class="mobile-card-row"><span class="card-label">درآمد</span><strong>{{ p.total_revenue|intcomma }} ریال</strong></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="pag-bar" data-pag-bar></div>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>داده‌ای نیست</p></div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>📥 خروجی اکسل و PDF</h3></div>
+    <form id="exportForm" method="get" action="{% url 'frontend:report_export_excel' %}">
+
+    {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}
+    {% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
+
+    {# ── Customers ── #}
+    <details open style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <summary style="cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sections" value="customers" class="export-section-toggle" data-target="cols-customers" checked>
+            مشتریان
+        </summary>
+        <p class="export-desc">
+            لیست مشتریان با اطلاعات تماس و سوابق خرید. می‌توانید فقط نام‌ها، شماره تلفن‌ها یا آدرس‌ها را انتخاب کنید.
+        </p>
+        <div id="cols-customers" class="export-columns" >
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="first_name" checked> نام
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="last_name" checked> نام خانوادگی
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="phone" checked> تلفن
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="address" checked> آدرس
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="national_id" checked> شناسه ملی
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="invoice_count" checked> تعداد فاکتور
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="customers_columns" value="total_purchases" checked> مجموع خرید
+            </label>
+        </div>
+        {# Customer PDF ZIP export #}
+        {% if customers %}
+        <div class="export-pdf-row">
+            <div id="pdfCustomerSearch" class="pdf-cust-search">
+                <input type="text" id="pdfCustomerInput" class="form-input" placeholder="جستجوی مشتری (نام، تلفن)..." autocomplete="off">
+                <input type="hidden" id="pdfCustomerSelect" name="customer_id" value="">
+                <div id="pdfCustomerDropdown" class="pdf-cust-dropdown"></div>
+            </div>
+            <button type="button" class="btn btn-sm" onclick="downloadCustomerPDF()" style="white-space:nowrap;">📥 دانلود PDF فاکتورها</button>
+            <span class="export-pdf-hint">فایل زیپ حاوی PDF همه فاکتورهای مشتری انتخابی</span>
+        </div>
+        {% endif %}
+    </details>
+
+    {# ── Products ── #}
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <summary style="cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sections" value="products" class="export-section-toggle" data-target="cols-products" checked>
+            محصولات
+        </summary>
+        <p class="export-desc">
+            اطلاعات محصولات شامل قیمت، واحد و آمار فروش.
+        </p>
+        <div id="cols-products" class="export-columns" >
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="name" checked> نام
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="unit" checked> واحد
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="frequency" checked> دوره
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="latest_price" checked> قیمت
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="total_sold" checked> تعداد فروش
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="products_columns" value="total_revenue" checked> مجموع درآمد
+            </label>
+        </div>
+    </details>
+
+    {# ── Invoices ── #}
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <summary style="cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sections" value="invoices" class="export-section-toggle" data-target="cols-invoices" checked>
+            فاکتورها
+        </summary>
+        <p class="export-desc">
+            لیست فاکتورها با مبالغ و وضعیت پرداخت.
+        </p>
+        <div id="cols-invoices" class="export-columns" >
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="invoice_number" checked> شماره فاکتور
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="customer_name" checked> مشتری
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="customer_phone" checked> تلفن
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="invoice_date" checked> تاریخ
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="due_date" checked> سررسید
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="subtotal" checked> جمع
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="item_taxes_total" checked> مالیات اقلام
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="discount_amount" checked> تخفیف
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="final_amount" checked> نهایی
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="invoices_columns" value="is_paid" checked> وضعیت
+            </label>
+        </div>
+    </details>
+
+    {# ── Invoice Items ── #}
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <summary style="cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sections" value="items" class="export-section-toggle" data-target="cols-items" checked>
+            اقلام فاکتور
+        </summary>
+        <p class="export-desc">
+            جزییات اقلام هر فاکتور (نام کالا، تعداد، قیمت).
+        </p>
+        <div id="cols-items" class="export-columns" >
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="invoice_number" checked> شماره فاکتور
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="product_name" checked> نام کالا
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="quantity" checked> تعداد
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="unit_price" checked> قیمت واحد
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="tax_amount" checked> مالیات
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="items_columns" value="total_price" checked> مبلغ کل
+            </label>
+        </div>
+    </details>
+
+    {# ── Sales Summary ── #}
+    <details style="margin-bottom:12px;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <summary style="cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sections" value="summary" class="export-section-toggle" data-target="cols-summary" checked>
+            خلاصه فروش
+        </summary>
+        <p class="export-desc">
+            گزارش ماهانه تعداد فاکتورها و مجموع درآمد.
+        </p>
+        <div id="cols-summary" class="export-columns" >
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="summary_columns" value="month" checked> ماه
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="summary_columns" value="count" checked> تعداد فاکتور
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="summary_columns" value="revenue" checked> مجموع درآمد
+            </label>
+        </div>
+    </details>
+
+    <div style="display:flex;gap:12px;margin-top:16px;">
+        <button type="submit" class="btn btn-accent">📥 دانلود اکسل</button>
+        <button type="button" class="btn" onclick="document.getElementById('exportForm').querySelectorAll('.export-section-toggle').forEach(c=>{c.checked=true});">انتخاب همه</button>
+        <button type="button" class="btn" onclick="document.getElementById('exportForm').querySelectorAll('.export-section-toggle').forEach(c=>{c.checked=false});">حذف انتخاب</button>
+    </div>
+
+    </form>
+</div>
+
+<script>
+// Toggle column visibility when section checkbox changes
+document.querySelectorAll('.export-section-toggle').forEach(function(toggle) {
+    toggle.addEventListener('change', function() {
+        var cols = document.getElementById(this.dataset.target);
+        if (cols) cols.style.display = this.checked ? 'flex' : 'none';
+    });
+});
+
+// PDF download for customer invoices
+function downloadCustomerPDF() {
+    var sel = document.getElementById('pdfCustomerSelect');
+    if (!sel || !sel.value) { alert('لطفاً ابتدا یک مشتری را انتخاب کنید'); return; }
+    window.location.href = '{% url "frontend:report_export_customer_pdf" 0 %}'.replace('/0/', '/' + sel.value + '/');
+}
+
+/* ── Searchable Customer Dropdown for PDF export ── */
+(function() {
+    var customers = [
+        {% for c in customers %}{ id: '{{ c.id }}', name: '{{ c.first_name }} {{ c.last_name }}', phone: '{{ c.phone|default:"" }}' }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    var input = document.getElementById('pdfCustomerInput');
+    var hidden = document.getElementById('pdfCustomerSelect');
+    var dropdown = document.getElementById('pdfCustomerDropdown');
+    if (!input || !dropdown) return;
+
+    var selectedIdx = -1;
+
+    function renderList(filter) {
+        var q = (filter || '').toLowerCase().trim();
+        var filtered = customers.filter(function(c) {
+            if (!q) return true;
+            return (c.name && c.name.toLowerCase().indexOf(q) !== -1) ||
+                   (c.phone && c.phone.indexOf(q) !== -1);
+        });
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="pdf-cust-empty">مشتری یافت نشد</div>';
+            dropdown.style.display = 'block';
+            selectedIdx = -1;
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < filtered.length; i++) {
+            var c = filtered[i];
+            var phoneStr = c.phone ? ' (' + c.phone + ')' : '';
+            html += '<div class="pdf-cust-item' + (String(c.id) === hidden.value ? ' selected' : '') +
+                    '" data-id="' + c.id + '" data-idx="' + i + '">' +
+                    '<span class="pdf-cust-name">' + c.name + '</span>' +
+                    '<span class="pdf-cust-phone">' + phoneStr + '</span></div>';
+        }
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+        selectedIdx = -1;
+
+        // Click handlers
+        dropdown.querySelectorAll('.pdf-cust-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selectCustomer(el.dataset.id);
+            });
+        });
+    }
+
+    function selectCustomer(id) {
+        var c = customers.find(function(x) { return String(x.id) === String(id); });
+        if (!c) return;
+        hidden.value = c.id;
+        input.value = c.name + (c.phone ? ' (' + c.phone + ')' : '');
+        dropdown.style.display = 'none';
+        input.classList.add('pdf-cust-selected');
+    }
+
+    input.addEventListener('focus', function() { renderList(input.value); });
+    input.addEventListener('input', function() {
+        hidden.value = '';
+        input.classList.remove('pdf-cust-selected');
+        renderList(input.value);
+    });
+
+    input.addEventListener('keydown', function(e) {
+        var items = dropdown.querySelectorAll('.pdf-cust-item');
+        if (!items.length || dropdown.style.display === 'none') return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+            highlightItem(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIdx = Math.max(selectedIdx - 1, 0);
+            highlightItem(items);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIdx >= 0 && items[selectedIdx]) {
+                selectCustomer(items[selectedIdx].dataset.id);
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    function highlightItem(items) {
+        items.forEach(function(el, i) {
+            el.classList.toggle('highlighted', i === selectedIdx);
+        });
+        if (items[selectedIdx]) items[selectedIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('pdfCustomerSearch').contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+})();
+
+/* ── Client-side pagination (10 per page) ── */
+(function() {
+    function toFa(n) {
+        return String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+    }
+    document.querySelectorAll('[data-page-size]').forEach(function(wrap) {
+        var size = parseInt(wrap.dataset.pageSize, 10) || 10;
+        var bar = wrap.querySelector('[data-pag-bar]');
+        var items = Array.from(wrap.querySelectorAll('[data-pag-item]'));
+        var total = items.length;
+        if (total <= size || !bar) return;
+        var pages = Math.ceil(total / size);
+        var current = 1;
+
+        function show(page) {
+            current = Math.min(Math.max(1, page), pages);
+            items.forEach(function(el, i) {
+                el.style.display = (i >= (current-1)*size && i < current*size) ? '' : 'none';
+            });
+            // render buttons
+            bar.innerHTML = '';
+            var mk = function(label, page, opts) {
+                opts = opts || {};
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn btn-sm' + (opts.active ? ' btn-primary' : ' btn-secondary');
+                b.style.minWidth = '34px';
+                b.innerHTML = label;
+                if (opts.disabled) { b.disabled = true; b.style.opacity = '.5'; }
+                else b.onclick = function() { show(page); };
+                return b;
+            };
+            bar.appendChild(mk('‹ قبلی', current-1, {disabled: current===1}));
+            for (var p = 1; p <= pages; p++) {
+                bar.appendChild(mk(toFa(p), p, {active: p===current}));
+            }
+            bar.appendChild(mk('بعدی ›', current+1, {disabled: current===pages}));
+            var info = document.createElement('span');
+            info.style.cssText = 'margin-inline-start:10px;color:var(--text-secondary);font-size:13px;align-self:center;';
+            info.textContent = 'صفحه ' + toFa(current) + ' از ' + toFa(pages) + ' (' + toFa(total) + ' مورد)';
+            bar.appendChild(info);
+        }
+        show(1);
+    });
+})();
+
+/* ── Product revenue pie chart (vanilla SVG, hover tooltip) ── */
+(function() {
+    var dataEl = document.getElementById('productRevenueData');
+    var canvas = document.getElementById('productPie');
+    if (!dataEl || !canvas) return;
+    var data;
+    try { data = JSON.parse(dataEl.textContent); } catch(e) { return; }
+    if (!Array.isArray(data) || !data.length) return;
+
+    var COLORS = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac','#86bcb6','#d37295'];
+    var total = data.reduce(function(s, d) { return s + parseFloat(d.revenue || 0); }, 0);
+    if (total <= 0) return;
+
+    // Group tiny slices (>12) into "سایر"
+    var slices = data.slice(0, 12).map(function(d, i) {
+        return { name: d.product_name, value: parseFloat(d.revenue || 0) };
+    });
+    if (data.length > 12) {
+        var rest = data.slice(12).reduce(function(s, d) { return s + parseFloat(d.revenue || 0); }, 0);
+        if (rest > 0) slices.push({ name: 'سایر', value: rest });
+    }
+
+    var cx = 210, cy = 210, r = 150, rInner = 0; // full pie
+    var startAngle = -Math.PI / 2; // start at top
+
+    function polar(angle) {
+        return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    }
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 420 420');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.maxWidth = '420px';
+    svg.style.maxHeight = '420px';
+    svg.setAttribute('role', 'img');
+
+    // Tooltip
+    var tip = document.createElement('div');
+    tip.style.cssText = 'position:fixed;pointer-events:none;background:var(--surface,#fff);color:var(--text,#222);border:1px solid var(--border,#ddd);border-radius:8px;padding:8px 12px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;z-index:9999;direction:rtl;';
+    document.body.appendChild(tip);
+
+    var faFmt = function(n) { return Math.round(n).toLocaleString('fa-IR'); };
+    var faPct = function(f) { return (f * 100).toLocaleString('fa-IR', {maximumFractionDigits: 1}) + '٪'; };
+
+    slices.forEach(function(s, i) {
+        var color = COLORS[i % COLORS.length];
+        var frac = s.value / total;
+        var endAngle = startAngle + frac * Math.PI * 2;
+        var p1 = polar(startAngle), p2 = polar(endAngle);
+        var large = frac > 0.5 ? 1 : 0;
+        var path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', 'M ' + cx + ' ' + cy + ' L ' + p1.x + ' ' + p1.y + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p2.x + ' ' + p2.y + ' Z');
+        path.setAttribute('fill', color);
+        path.setAttribute('stroke', 'var(--surface,#fff)');
+        path.setAttribute('stroke-width', '2');
+        path.style.cursor = 'pointer';
+        path.style.transition = 'filter .15s ease';
+        path.addEventListener('mousemove', function(ev) {
+            tip.style.display = 'block';
+            tip.innerHTML = '<strong>' + s.name.replace(/</g, '&lt;') + '</strong> — ' + faPct(frac) + '<br>' + faFmt(s.value) + ' ریال';
+            tip.style.left = (ev.clientX + 14) + 'px';
+            tip.style.top = (ev.clientY + 14) + 'px';
+            path.style.filter = 'drop-shadow(0 0 4px ' + color + ') drop-shadow(0 0 10px ' + color + ') drop-shadow(0 0 18px ' + color + ')';
+            path.style.strokeWidth = '3';
+        });
+        path.addEventListener('mouseleave', function() {
+            tip.style.display = 'none';
+            path.style.filter = '';
+            path.style.strokeWidth = '2';
+        });
+        svg.appendChild(path);
+        startAngle = endAngle;
+    });
+
+    canvas.replaceWith(svg);
+})();
+</script>
+{% endblock %}

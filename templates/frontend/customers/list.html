@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}مشتریان — Cat Invoice{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>مشتریان</h1>
+    <a href="{% url 'frontend:customer_create' %}" class="btn btn-primary">+ مشتری جدید</a>
+</div>
+
+<div class="search-bar">
+    <form method="get" action="{% url 'frontend:customer_list' %}" style="display:flex;gap:8px;max-width:460px;flex:1;">
+        <input class="form-input" placeholder="جستجو: نام، تلفن، کد ملی..." name="search"
+               value="{{ search_query }}" style="flex:1;">
+        <button type="submit" class="btn btn-secondary">🔍</button>
+        {% if search_query %}<a href="{% url 'frontend:customer_list' %}" class="btn btn-secondary">✕</a>{% endif %}
+    </form>
+</div>
+
+{% if customers %}
+<form id="bulkDeleteForm" method="post" action="{% url 'frontend:customer_bulk_delete' %}">
+{% csrf_token %}
+<div id="bulkActions" style="display:none;margin-bottom:12px;">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('آیا از حذف دسته‌ای اطمینان دارید؟')">حذف انتخاب شده</button>
+    <span id="selectedCount"></span>
+</div>
+<div class="table-container desktop-only">
+    <table id="customerTable">
+        <thead><tr>
+            <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+            <th>نام</th><th>تلفن</th><th>آدرس</th><th>تعداد فاکتور</th><th>عملیات</th>
+        </tr></thead>
+        <tbody>
+        {% for c in customers %}
+        <tr>
+            <td><input type="checkbox" name="customer_ids" value="{{ c.id }}" class="item-checkbox" onchange="updateBulkActions()"></td>
+            <td><strong>{{ c.full_name }}</strong></td>
+            <td dir="ltr" style="text-align:left;">{{ c.phone|default:"-" }}</td>
+            <td>{{ c.address|default:"-"|truncatewords:5 }}</td>
+            <td>{{ c.invoice_count }}</td>
+            <td>
+                <a href="{% url 'frontend:customer_edit' c.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+                <form method="post" action="{% url 'frontend:customer_delete' c.id %}" style="display:inline;"
+                      data-confirm="آیا از حذف این مشتری اطمینان دارید؟">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+</form>
+
+<div class="mobile-cards mobile-only">
+    {% for c in customers %}
+    <div class="mobile-card">
+        <div class="mobile-card-header">
+            <strong>{{ c.full_name }}</strong>
+        </div>
+        <div class="mobile-card-body">
+            <div class="mobile-card-row">
+                <span class="card-label">تلفن</span>
+                <span dir="ltr">{{ c.phone|default:"-" }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">آدرس</span>
+                <span>{{ c.address|default:"-"|truncatewords:5 }}</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="card-label">فاکتورها</span>
+                <span>{{ c.invoice_count }}</span>
+            </div>
+        </div>
+        <div class="mobile-card-actions">
+            <a href="{% url 'frontend:customer_edit' c.id %}" class="btn btn-sm btn-secondary">ویرایش</a>
+            <form method="post" action="{% url 'frontend:customer_delete' c.id %}" style="display:inline;"
+                  data-confirm="آیا از حذف این مشتری اطمینان دارید؟">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% include "frontend/includes/pagination.html" %}
+{% else %}
+<div class="empty-state">
+    <div class="icon">👥</div>
+    {% if search_query %}
+    <p>نتیجه‌ای برای «{{ search_query }}» یافت نشد</p>
+    <a href="{% url 'frontend:customer_list' %}" class="btn btn-secondary" style="margin-top:12px;">حذف جستجو</a>
+    {% else %}
+    <p>مشتری ثبت نشده</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% block extra_js %}
+<script>
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.item-checkbox').forEach(c => c.checked = cb.checked);
+    updateBulkActions();
+}
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.item-checkbox:checked').length;
+    const bar = document.getElementById('bulkActions');
+    const cnt = document.getElementById('selectedCount');
+    if (checked > 0) {
+        bar.style.display = 'block';
+        cnt.textContent = checked + ' مورد انتخاب شده';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

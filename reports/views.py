@@ -62,14 +62,14 @@ def product_report(request):
     """Product analytics."""
     user = request.user
     products = Product.objects.filter(user=user).annotate(
-        times_sold=Count('invoice_items'),
-        total_revenue=Sum('invoice_items__total_price'),
-    ).order_by('-total_revenue')
+        times_sold_count=Count('invoice_items'),
+        revenue_sum=Sum('invoice_items__total_price'),
+    ).order_by('-revenue_sum')
 
     return Response([{
         'id': p.id,
         'name': p.name,
         'latest_price': p.latest_price,
-        'times_sold': p.times_sold or 0,
-        'total_revenue': p.total_revenue or 0,
+        'times_sold': p.times_sold_count or 0,
+        'total_revenue': p.revenue_sum or 0,
     } for p in products[:50]])
